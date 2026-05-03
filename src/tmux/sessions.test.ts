@@ -1,0 +1,119 @@
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { listSessions } from "./sessions"
+
+describe("listSessions", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
+  test("parses tmux sessions", async () => {
+    const calls = mockTmux({
+      exitCode: 0,
+      stdout: [
+        ["$1", "work", "3", "1", "1700000000", "1700000100"].join("\x1f"),
+        ["$2", "notes", "1", "0", "1700000200", "1700000300"].join("\x1f"),
+      ].join("\n"),
+    })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: true,
+      sessions: [
+        {
+          id: "$1",
+          name: "work",
+          windows: 3,
+          attached: true,
+          createdAt: new Date(1700000000 * 1000),
+          activityAt: new Date(1700000100 * 1000),
+        },
+        {
+          id: "$2",
+          name: "notes",
+          windows: 1,
+          attached: false,
+          createdAt: new Date(1700000200 * 1000),
+          activityAt: new Date(1700000300 * 1000),
+        },
+      ],
+    })
+
+    expect(calls).toEqual([
+      [
+        "tmux",
+        "list-sessions",
+        "-F",
+        "#{session_id}\x1f#{session_name}\x1f#{session_windows}\x1f#{session_attached}\x1f#{session_created}\x1f#{session_activity}",
+      ],
+    ])
+  })
+
+  test("returns an empty list when tmux has no sessions", async () => {
+    mockTmux({ exitCode: 1, stderr: "no server running on /tmp/tmux-1000/default" })
+
+    await expect(listSessions()).resolves.toEqual({ ok: true, sessions: [] })
+  })
+
+  test("returns an empty list for tmux no sessions errors", async () => {
+    mockTmux({ exitCode: 1, stderr: "no sessions" })
+
+    await expect(listSessions()).resolves.toEqual({ ok: true, sessions: [] })
+  })
+
+  test("returns tmux stderr for other failures", async () => {
+    mockTmux({ exitCode: 1, stderr: "permission denied" })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: false,
+      message: "permission denied",
+    })
+  })
+
+  test("falls back to stdout for failures without stderr", async () => {
+    mockTmux({ exitCode: 1, stdout: "stdout failure" })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: false,
+      message: "stdout failure",
+    })
+  })
+
+  test("returns a default message for failures without output", async () => {
+    mockTmux({ exitCode: 1 })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: false,
+      message: "tmux session listing failed.",
+    })
+  })
+
+  test("returns a helpful message when tmux is missing", async () => {
+    spyOn(Bun, "spawn").mockImplementation(() => {
+      throw new Error("ENOENT")
+    })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: false,
+      message: "tmux is required but was not found.",
+    })
+  })
+})
+
+function mockTmux(result: {
+  exitCode: number
+  stderr?: string
+  stdout?: string
+}): string[][] {
+  const calls: string[][] = []
+
+  spyOn(Bun, "spawn").mockImplementation((command) => {
+    calls.push([...command])
+
+    return {
+      exited: Promise.resolve(result.exitCode),
+      stderr: result.stderr ?? "",
+      stdout: result.stdout ?? "",
+    } as ReturnType<typeof Bun.spawn>
+  })
+
+  return calls
+}
