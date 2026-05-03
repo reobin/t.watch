@@ -1,6 +1,6 @@
 import type { TmuxSession } from "./tmux"
 
-const title = "twatch"
+const title = "t.watch"
 
 export function renderLoading(): string {
   return renderMessage("Loading tmux sessions...")

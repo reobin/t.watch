@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "twatch",
+      "name": "t.watch",
       "dependencies": {
         "@opentui/core": "^0.2.2",
       },
