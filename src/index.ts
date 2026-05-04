@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
 
-import { startApp } from "./app"
+import { startApp } from "./app";
 
-await startApp()
+await startApp();

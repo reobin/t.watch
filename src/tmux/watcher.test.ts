@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { watchSessions } from "./watcher"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { watchSessions } from "./watcher";
 
 const hooks = [
   "session-created",
@@ -16,169 +16,155 @@ const hooks = [
   "client-attached",
   "client-detached",
   "client-session-changed",
-] as const
+] as const;
 
 describe("watchSessions", () => {
   afterEach(() => {
-    mock.restore()
-  })
+    mock.restore();
+  });
 
   test("installs session hooks and stops cleanly", async () => {
-    const wait = deferred<number>()
-    const calls: string[][] = []
-    const kill = mock()
+    const wait = deferred<number>();
+    const calls: string[][] = [];
+    const kill = mock();
 
     spyOn(Bun, "spawn").mockImplementation((command) => {
-      const args = Array.isArray(command) ? command : command.cmd
-      calls.push([...args])
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
 
       if (args[1] === "wait-for") {
-        return processResult({ exited: wait.promise, kill })
+        return processResult({ exited: wait.promise, kill });
       }
 
-      return processResult({ exited: Promise.resolve(0) })
-    })
+      return processResult({ exited: Promise.resolve(0) });
+    });
 
-    const result = await watchSessions(() => undefined)
+    const result = await watchSessions(() => undefined);
 
-    expect(result.ok).toBe(true)
-    expect(calls).toEqual([...installHookCalls(), waitForCall()])
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual([...installHookCalls(), waitForCall()]);
 
     if (result.ok === true) {
-      await result.watcher.stop()
+      await result.watcher.stop();
     }
 
-    expect(kill).toHaveBeenCalled()
-    expect(calls).toEqual([
-      ...installHookCalls(),
-      waitForCall(),
-      ...unsetHookCalls(),
-    ])
-  })
+    expect(kill).toHaveBeenCalled();
+    expect(calls).toEqual([...installHookCalls(), waitForCall(), ...unsetHookCalls()]);
+  });
 
   test("cleans up installed hooks when setup fails", async () => {
-    const calls: string[][] = []
+    const calls: string[][] = [];
 
     spyOn(Bun, "spawn").mockImplementation((command) => {
-      const args = Array.isArray(command) ? command : command.cmd
-      calls.push([...args])
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
 
       if (args[3] === hookTarget("session-closed")) {
-        return processResult({ exited: Promise.resolve(1), stderr: "set-hook failed" })
+        return processResult({ exited: Promise.resolve(1), stderr: "set-hook failed" });
       }
 
-      return processResult({ exited: Promise.resolve(0) })
-    })
+      return processResult({ exited: Promise.resolve(0) });
+    });
 
     await expect(watchSessions(() => undefined)).resolves.toEqual({
       ok: false,
       message: "set-hook failed",
-    })
+    });
 
     expect(calls).toEqual([
       installHookCall("session-created"),
       installHookCall("session-closed"),
       unsetHookCall("session-created"),
-    ])
-  })
+    ]);
+  });
 
   test("calls onStop and cleans up hooks when waiting fails", async () => {
-    const calls: string[][] = []
-    const onStop = mock()
+    const calls: string[][] = [];
+    const onStop = mock();
 
     spyOn(Bun, "spawn").mockImplementation((command) => {
-      const args = Array.isArray(command) ? command : command.cmd
-      calls.push([...args])
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
 
       if (args[1] === "wait-for") {
-        return processResult({ exited: Promise.resolve(1), stderr: "wait failed" })
+        return processResult({ exited: Promise.resolve(1), stderr: "wait failed" });
       }
 
-      return processResult({ exited: Promise.resolve(0) })
-    })
+      return processResult({ exited: Promise.resolve(0) });
+    });
 
-    const result = await watchSessions(() => undefined, onStop)
+    const result = await watchSessions(() => undefined, onStop);
 
-    expect(result.ok).toBe(true)
-    await waitForMicrotasks()
+    expect(result.ok).toBe(true);
+    await waitForMicrotasks();
 
-    expect(onStop).toHaveBeenCalledWith("wait failed")
-    expect(calls).toEqual([
-      ...installHookCalls(),
-      waitForCall(),
-      ...unsetHookCalls(),
-    ])
-  })
+    expect(onStop).toHaveBeenCalledWith("wait failed");
+    expect(calls).toEqual([...installHookCalls(), waitForCall(), ...unsetHookCalls()]);
+  });
 
   test("returns a helpful message when tmux is missing", async () => {
     spyOn(Bun, "spawn").mockImplementation(() => {
-      throw new Error("ENOENT")
-    })
+      throw new Error("ENOENT");
+    });
 
     await expect(watchSessions(() => undefined)).resolves.toEqual({
       ok: false,
       message: "tmux is required but was not found.",
-    })
-  })
-})
+    });
+  });
+});
 
 function installHookCalls(): string[][] {
-  return hooks.map(installHookCall)
+  return hooks.map(installHookCall);
 }
 
 function installHookCall(hook: (typeof hooks)[number]): string[] {
-  return [
-    "tmux",
-    "set-hook",
-    "-g",
-    hookTarget(hook),
-    `wait-for -S ${channel()}`,
-  ]
+  return ["tmux", "set-hook", "-g", hookTarget(hook), `wait-for -S ${channel()}`];
 }
 
 function unsetHookCalls(): string[][] {
-  return hooks.map(unsetHookCall)
+  return hooks.map(unsetHookCall);
 }
 
 function unsetHookCall(hook: (typeof hooks)[number]): string[] {
-  return ["tmux", "set-hook", "-gu", hookTarget(hook)]
+  return ["tmux", "set-hook", "-gu", hookTarget(hook)];
 }
 
 function waitForCall(): string[] {
-  return ["tmux", "wait-for", channel()]
+  return ["tmux", "wait-for", channel()];
 }
 
 function hookTarget(hook: string): string {
-  return `${hook}[${process.pid}]`
+  return `${hook}[${process.pid}]`;
 }
 
 function channel(): string {
-  return `thud-sh-sessions-${process.pid}`
+  return `thud-sh-sessions-${process.pid}`;
 }
 
 function processResult(options: {
-  exited: Promise<number>
-  kill?: () => void
-  stderr?: string
-  stdout?: string
+  exited: Promise<number>;
+  kill?: () => void;
+  stderr?: string;
+  stdout?: string;
 }): ReturnType<typeof Bun.spawn> {
   return {
     exited: options.exited,
     kill: options.kill ?? mock(),
     stderr: options.stderr ?? "",
     stdout: options.stdout ?? "",
-  } as unknown as ReturnType<typeof Bun.spawn>
+  } as unknown as ReturnType<typeof Bun.spawn>;
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void
+  let resolve!: (value: T) => void;
   const promise = new Promise<T>((innerResolve) => {
-    resolve = innerResolve
-  })
+    resolve = innerResolve;
+  });
 
-  return { promise, resolve }
+  return { promise, resolve };
 }
 
 async function waitForMicrotasks(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }

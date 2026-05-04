@@ -1,5 +1,5 @@
-import { missingTmuxMessage, runTmux } from "./commands"
-import type { TmuxSessionWatchResult } from "./types"
+import { missingTmuxMessage, runTmux } from "./commands";
+import type { TmuxSessionWatchResult } from "./types";
 
 const sessionChangeHooks = [
   "session-created",
@@ -16,111 +16,104 @@ const sessionChangeHooks = [
   "client-attached",
   "client-detached",
   "client-session-changed",
-] as const
+] as const;
 
 export async function watchSessions(
   onChange: () => void | Promise<void>,
   onStop?: (message: string) => void,
 ): Promise<TmuxSessionWatchResult> {
-  const hookIndex = String(process.pid)
-  const channel = `thud-sh-sessions-${process.pid}`
-  const installedHooks: string[] = []
-  let waitProcess: ReturnType<typeof Bun.spawn> | undefined
-  let stopped = false
-  let refreshTimeout: ReturnType<typeof setTimeout> | undefined
+  const hookIndex = String(process.pid);
+  const channel = `thud-sh-sessions-${process.pid}`;
+  const installedHooks: string[] = [];
+  let waitProcess: ReturnType<typeof Bun.spawn> | undefined;
+  let stopped = false;
+  let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
     for (const hook of sessionChangeHooks) {
-      const hookTarget = `${hook}[${hookIndex}]`
-      const result = await runTmux([
-        "set-hook",
-        "-g",
-        hookTarget,
-        `wait-for -S ${channel}`,
-      ])
+      const hookTarget = `${hook}[${hookIndex}]`;
+      const result = await runTmux(["set-hook", "-g", hookTarget, `wait-for -S ${channel}`]);
 
       if (result.exitCode !== 0) {
-        await unsetHooks(installedHooks)
+        await unsetHooks(installedHooks);
 
         return {
           ok: false,
           message: result.stderr.trim() || "tmux session watcher failed.",
-        }
+        };
       }
 
-      installedHooks.push(hookTarget)
+      installedHooks.push(hookTarget);
     }
   } catch (error) {
-    await unsetHooks(installedHooks)
+    await unsetHooks(installedHooks);
 
     if (error instanceof Error && error.message.includes("ENOENT")) {
-      return { ok: false, message: missingTmuxMessage }
+      return { ok: false, message: missingTmuxMessage };
     }
 
-    throw error
+    throw error;
   }
 
   const scheduleRefresh = () => {
     if (refreshTimeout) {
-      return
+      return;
     }
 
     refreshTimeout = setTimeout(() => {
-      refreshTimeout = undefined
-      void onChange()
-    }, 75)
-  }
+      refreshTimeout = undefined;
+      void onChange();
+    }, 75);
+  };
 
   const waitForChanges = async () => {
     while (!stopped) {
       const tmuxProcess = Bun.spawn(["tmux", "wait-for", channel], {
         stderr: "pipe",
         stdout: "pipe",
-      })
-      waitProcess = tmuxProcess
+      });
+      waitProcess = tmuxProcess;
 
       const [exitCode, stderr] = await Promise.all([
         tmuxProcess.exited,
         new Response(tmuxProcess.stderr).text(),
-      ])
+      ]);
 
       if (stopped) {
-        break
+        break;
       }
 
       if (exitCode !== 0) {
-        stopped = true
-        await unsetHooks(installedHooks)
-        onStop?.(stderr.trim() || "tmux session watcher stopped.")
-        break
+        stopped = true;
+        await unsetHooks(installedHooks);
+        onStop?.(stderr.trim() || "tmux session watcher stopped.");
+        break;
       }
 
-      scheduleRefresh()
+      scheduleRefresh();
     }
-  }
+  };
 
-  void waitForChanges()
+  void waitForChanges();
 
   return {
     ok: true,
     watcher: {
       stop: async () => {
-        stopped = true
+        stopped = true;
 
         if (refreshTimeout) {
-          clearTimeout(refreshTimeout)
-          refreshTimeout = undefined
+          clearTimeout(refreshTimeout);
+          refreshTimeout = undefined;
         }
 
-        waitProcess?.kill()
-        await unsetHooks(installedHooks)
+        waitProcess?.kill();
+        await unsetHooks(installedHooks);
       },
     },
-  }
+  };
 }
 
 async function unsetHooks(hooks: string[]): Promise<void> {
-  await Promise.all(
-    hooks.map((hook) => runTmux(["set-hook", "-gu", hook]).catch(() => undefined)),
-  )
+  await Promise.all(hooks.map((hook) => runTmux(["set-hook", "-gu", hook]).catch(() => undefined)));
 }

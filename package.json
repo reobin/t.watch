@@ -5,30 +5,40 @@
     "type": "git",
     "url": "git+https://github.com/reobin/thud.sh.git"
   },
-  "type": "module",
   "bin": {
-    "thud.sh": "dist/index.js",
-    "thud": "dist/index.js"
-  },
-  "exports": {
-    "./server": "./integrations/opencode/thud-sh-status.ts"
+    "thud": "dist/index.js",
+    "thud.sh": "dist/index.js"
   },
   "files": [
     "dist",
     "integrations",
     "README.md"
   ],
+  "type": "module",
+  "exports": {
+    "./server": "./integrations/opencode/thud-sh-status.ts"
+  },
   "scripts": {
     "start": "bun run src/index.ts",
     "build": "bun build src/index.ts --target=bun --outdir=dist && chmod +x dist/index.js",
     "prepack": "bun run build",
-    "test": "bun test",
-    "test:unit": "bun test"
+    "check": "concurrently --kill-others-on-fail --success all \"bun run lint.check\" \"bun run format.check\" \"bun run tc\" \"bun run test\"",
+    "check.fix": "bun run lint && bun run format && bun run check",
+    "lint": "oxlint --fix .",
+    "lint.check": "oxlint .",
+    "format": "oxfmt --write .",
+    "format.check": "oxfmt --check .",
+    "tc": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@opentui/core": "^0.2.2"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "concurrently": "^9.2.1",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "typescript": "^6.0.3"
   }
 }

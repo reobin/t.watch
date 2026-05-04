@@ -69,10 +69,7 @@ function renderPaneName(
   isActive: boolean,
   isSshAttachedSession = false,
 ): TextChunk[] {
-  return [
-    renderPaneProcessName(pane, isActive, isSshAttachedSession),
-    ...renderStatusPill(pane),
-  ];
+  return [renderPaneProcessName(pane, isActive, isSshAttachedSession), ...renderStatusPill(pane)];
 }
 
 function renderPaneProcessName(

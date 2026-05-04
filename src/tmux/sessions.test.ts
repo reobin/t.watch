@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { listSessions } from "./sessions"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { listSessions } from "./sessions";
 
 describe("listSessions", () => {
   afterEach(() => {
-    mock.restore()
-  })
+    mock.restore();
+  });
 
   test("parses tmux sessions", async () => {
     const calls = mockTmux({
@@ -55,21 +55,18 @@ describe("listSessions", () => {
               "",
               "1700000120",
             ].join("\x1f"),
-            ["$2", "@3", "%3", "1", "1", "vim", "30", "notes"].join(
-              "\x1f",
-            ),
+            ["$2", "@3", "%3", "1", "1", "vim", "30", "notes"].join("\x1f"),
           ].join("\n"),
         },
         { exitCode: 0, stdout: "" },
         {
           exitCode: 0,
-          stdout: [
-            "100 10 node node /home/reobin/.local/bin/opencode",
-            "200 20 bash -bash",
-          ].join("\n"),
+          stdout: ["100 10 node node /home/reobin/.local/bin/opencode", "200 20 bash -bash"].join(
+            "\n",
+          ),
         },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toEqual({
       ok: true,
@@ -151,7 +148,7 @@ describe("listSessions", () => {
           activityAt: new Date(1700000300 * 1000),
         },
       ],
-    })
+    });
 
     expect(calls).toEqual([
       [
@@ -176,17 +173,15 @@ describe("listSessions", () => {
       ],
       ["tmux", "list-clients", "-F", "#{session_id}\x1f#{client_pid}"],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
-    ])
-  })
+    ]);
+  });
 
   test("detects sessions attached through ssh", async () => {
     mockTmux({
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
         },
         { exitCode: 0, stdout: "" },
         { exitCode: 0, stdout: "" },
@@ -200,7 +195,7 @@ describe("listSessions", () => {
           ].join("\n"),
         },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toMatchObject({
       ok: true,
@@ -211,24 +206,21 @@ describe("listSessions", () => {
           sshAttached: true,
         },
       ],
-    })
-  })
+    });
+  });
 
   test("keeps local coloring when a session also has a local client", async () => {
     mockTmux({
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join("\x1f"),
         },
         { exitCode: 0, stdout: "" },
         { exitCode: 0, stdout: "" },
         {
           exitCode: 0,
-          stdout: [["$1", "30"].join("\x1f"), ["$1", "40"].join("\x1f")]
-            .join("\n"),
+          stdout: [["$1", "30"].join("\x1f"), ["$1", "40"].join("\x1f")].join("\n"),
         },
         {
           exitCode: 0,
@@ -240,7 +232,7 @@ describe("listSessions", () => {
           ].join("\n"),
         },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toMatchObject({
       ok: true,
@@ -251,17 +243,15 @@ describe("listSessions", () => {
           sshAttached: false,
         },
       ],
-    })
-  })
+    });
+  });
 
   test("detects panes opened through ssh", async () => {
     mockTmux({
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
         },
         {
           exitCode: 0,
@@ -270,12 +260,8 @@ describe("listSessions", () => {
         {
           exitCode: 0,
           stdout: [
-            ["$1", "@1", "%1", "1", "1", "bash", "40", "shell"].join(
-              "\x1f",
-            ),
-            ["$1", "@1", "%2", "2", "0", "bash", "60", "shell"].join(
-              "\x1f",
-            ),
+            ["$1", "@1", "%1", "1", "1", "bash", "40", "shell"].join("\x1f"),
+            ["$1", "@1", "%2", "2", "0", "bash", "60", "shell"].join("\x1f"),
           ].join("\n"),
         },
         { exitCode: 0, stdout: "" },
@@ -284,7 +270,7 @@ describe("listSessions", () => {
           stdout: ["50 40 ssh ssh server.example.com"].join("\n"),
         },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toMatchObject({
       ok: true,
@@ -306,17 +292,15 @@ describe("listSessions", () => {
           ],
         },
       ],
-    })
-  })
+    });
+  });
 
   test("uses zero panes when pane listing fails", async () => {
     mockTmux({
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join("\x1f"),
         },
         {
           exitCode: 0,
@@ -326,7 +310,7 @@ describe("listSessions", () => {
         { exitCode: 0, stdout: "" },
         { exitCode: 0, stdout: "" },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toEqual({
       ok: true,
@@ -349,17 +333,15 @@ describe("listSessions", () => {
           activityAt: new Date(1700000100 * 1000),
         },
       ],
-    })
-  })
+    });
+  });
 
   test("uses unknown for invalid integration statuses", async () => {
     mockTmux({
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
         },
         {
           exitCode: 0,
@@ -388,7 +370,7 @@ describe("listSessions", () => {
           stdout: "100 10 node node /home/reobin/.local/bin/opencode",
         },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toMatchObject({
       ok: true,
@@ -408,17 +390,15 @@ describe("listSessions", () => {
           ],
         },
       ],
-    })
-  })
+    });
+  });
 
   test("keeps editor panes named after the editor", async () => {
     mockTmux({
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
         },
         {
           exitCode: 0,
@@ -426,9 +406,7 @@ describe("listSessions", () => {
         },
         {
           exitCode: 0,
-          stdout: ["$1", "@1", "%1", "1", "1", "nvim", "40", "node thread"].join(
-            "\x1f",
-          ),
+          stdout: ["$1", "@1", "%1", "1", "1", "nvim", "40", "node thread"].join("\x1f"),
         },
         { exitCode: 0, stdout: "" },
         {
@@ -436,7 +414,7 @@ describe("listSessions", () => {
           stdout: "400 40 lazygit lazygit",
         },
       ],
-    })
+    });
 
     await expect(listSessions()).resolves.toEqual({
       ok: true,
@@ -469,86 +447,86 @@ describe("listSessions", () => {
           activityAt: new Date(1700000100 * 1000),
         },
       ],
-    })
-  })
+    });
+  });
 
   test("returns an empty list when tmux has no sessions", async () => {
-    mockTmux({ exitCode: 1, stderr: "no server running on /tmp/tmux-1000/default" })
+    mockTmux({ exitCode: 1, stderr: "no server running on /tmp/tmux-1000/default" });
 
-    await expect(listSessions()).resolves.toEqual({ ok: true, sessions: [] })
-  })
+    await expect(listSessions()).resolves.toEqual({ ok: true, sessions: [] });
+  });
 
   test("returns an empty list for tmux no sessions errors", async () => {
-    mockTmux({ exitCode: 1, stderr: "no sessions" })
+    mockTmux({ exitCode: 1, stderr: "no sessions" });
 
-    await expect(listSessions()).resolves.toEqual({ ok: true, sessions: [] })
-  })
+    await expect(listSessions()).resolves.toEqual({ ok: true, sessions: [] });
+  });
 
   test("returns tmux stderr for other failures", async () => {
-    mockTmux({ exitCode: 1, stderr: "permission denied" })
+    mockTmux({ exitCode: 1, stderr: "permission denied" });
 
     await expect(listSessions()).resolves.toEqual({
       ok: false,
       message: "permission denied",
-    })
-  })
+    });
+  });
 
   test("falls back to stdout for failures without stderr", async () => {
-    mockTmux({ exitCode: 1, stdout: "stdout failure" })
+    mockTmux({ exitCode: 1, stdout: "stdout failure" });
 
     await expect(listSessions()).resolves.toEqual({
       ok: false,
       message: "stdout failure",
-    })
-  })
+    });
+  });
 
   test("returns a default message for failures without output", async () => {
-    mockTmux({ exitCode: 1 })
+    mockTmux({ exitCode: 1 });
 
     await expect(listSessions()).resolves.toEqual({
       ok: false,
       message: "tmux session listing failed.",
-    })
-  })
+    });
+  });
 
   test("returns a helpful message when tmux is missing", async () => {
     spyOn(Bun, "spawn").mockImplementation(() => {
-      throw new Error("ENOENT")
-    })
+      throw new Error("ENOENT");
+    });
 
     await expect(listSessions()).resolves.toEqual({
       ok: false,
       message: "tmux is required but was not found.",
-    })
-  })
-})
+    });
+  });
+});
 
 function mockTmux(input: {
-  exitCode?: number
-  stderr?: string
-  stdout?: string
-  results?: { exitCode: number; stderr?: string; stdout?: string }[]
+  exitCode?: number;
+  stderr?: string;
+  stdout?: string;
+  results?: { exitCode: number; stderr?: string; stdout?: string }[];
 }): string[][] {
-  const calls: string[][] = []
+  const calls: string[][] = [];
   const results = input.results ?? [
     {
       exitCode: input.exitCode ?? 0,
       stderr: input.stderr,
       stdout: input.stdout,
     },
-  ]
+  ];
 
   spyOn(Bun, "spawn").mockImplementation((command) => {
-    const args = Array.isArray(command) ? command : command.cmd
-    calls.push([...args])
-    const result = results[Math.min(calls.length - 1, results.length - 1)]
+    const args = Array.isArray(command) ? command : command.cmd;
+    calls.push([...args]);
+    const result = results[Math.min(calls.length - 1, results.length - 1)];
 
     return {
       exited: Promise.resolve(result.exitCode),
       stderr: result.stderr ?? "",
       stdout: result.stdout ?? "",
-    } as unknown as ReturnType<typeof Bun.spawn>
-  })
+    } as unknown as ReturnType<typeof Bun.spawn>;
+  });
 
-  return calls
+  return calls;
 }
