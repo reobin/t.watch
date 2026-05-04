@@ -12,6 +12,7 @@ export type TmuxSession = {
   id: string
   name: string
   windows: number
+  panes: number
   attached: boolean
   createdAt: Date
   activityAt: Date

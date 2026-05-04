@@ -26,7 +26,7 @@ export function renderSessions(sessions: TmuxSession[]): StyledText {
 }
 
 function renderSession(session: TmuxSession): TextChunk {
-  const content = `${session.attached ? ">" : "*"} ${session.name}`
+  const content = `${session.attached ? ">" : "*"} ${session.name} ${session.windows}w ${session.panes}p`
 
   return session.attached ? bold(content) : textChunk(content)
 }

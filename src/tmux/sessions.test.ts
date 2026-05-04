@@ -8,11 +8,19 @@ describe("listSessions", () => {
 
   test("parses tmux sessions", async () => {
     const calls = mockTmux({
-      exitCode: 0,
-      stdout: [
-        ["$1", "work", "3", "2", "1700000000", "1700000100"].join("\x1f"),
-        ["$2", "notes", "1", "0", "1700000200", "1700000300"].join("\x1f"),
-      ].join("\n"),
+      results: [
+        {
+          exitCode: 0,
+          stdout: [
+            ["$1", "work", "3", "2", "1700000000", "1700000100"].join("\x1f"),
+            ["$2", "notes", "1", "0", "1700000200", "1700000300"].join("\x1f"),
+          ].join("\n"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "$1", "$1", "$1", "$2"].join("\n"),
+        },
+      ],
     })
 
     await expect(listSessions()).resolves.toEqual({
@@ -22,6 +30,7 @@ describe("listSessions", () => {
           id: "$1",
           name: "work",
           windows: 3,
+          panes: 4,
           attached: true,
           createdAt: new Date(1700000000 * 1000),
           activityAt: new Date(1700000100 * 1000),
@@ -30,6 +39,7 @@ describe("listSessions", () => {
           id: "$2",
           name: "notes",
           windows: 1,
+          panes: 1,
           attached: false,
           createdAt: new Date(1700000200 * 1000),
           activityAt: new Date(1700000300 * 1000),
@@ -44,7 +54,37 @@ describe("listSessions", () => {
         "-F",
         "#{session_id}\x1f#{session_name}\x1f#{session_windows}\x1f#{session_attached}\x1f#{session_created}\x1f#{session_activity}",
       ],
+      ["tmux", "list-panes", "-a", "-F", "#{session_id}"],
     ])
+  })
+
+  test("uses zero panes when pane listing fails", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "3", "2", "1700000000", "1700000100"].join(
+            "\x1f",
+          ),
+        },
+        { exitCode: 1, stderr: "pane listing failed" },
+      ],
+    })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: true,
+      sessions: [
+        {
+          id: "$1",
+          name: "work",
+          windows: 3,
+          panes: 0,
+          attached: true,
+          createdAt: new Date(1700000000 * 1000),
+          activityAt: new Date(1700000100 * 1000),
+        },
+      ],
+    })
   })
 
   test("returns an empty list when tmux has no sessions", async () => {
@@ -98,15 +138,24 @@ describe("listSessions", () => {
   })
 })
 
-function mockTmux(result: {
-  exitCode: number
+function mockTmux(input: {
+  exitCode?: number
   stderr?: string
   stdout?: string
+  results?: { exitCode: number; stderr?: string; stdout?: string }[]
 }): string[][] {
   const calls: string[][] = []
+  const results = input.results ?? [
+    {
+      exitCode: input.exitCode ?? 0,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    },
+  ]
 
   spyOn(Bun, "spawn").mockImplementation((command) => {
     calls.push([...command])
+    const result = results[Math.min(calls.length - 1, results.length - 1)]
 
     return {
       exited: Promise.resolve(result.exitCode),

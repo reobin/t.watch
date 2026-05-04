@@ -31,14 +31,16 @@ describe("render", () => {
     const output = renderSessions(sessions)
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
-      ["t.watch", "", "Sessions", "", "> work", "* notes"].join("\n"),
+      ["t.watch", "", "Sessions", "", "> work 1w 1p", "* notes 1w 1p"].join(
+        "\n",
+      ),
     )
-    expect(output.chunks.find((chunk) => chunk.text === "> work")?.attributes).toBe(
-      createTextAttributes({ bold: true }),
-    )
-    expect(output.chunks.find((chunk) => chunk.text === "* notes")?.attributes).toBe(
-      0,
-    )
+    expect(
+      output.chunks.find((chunk) => chunk.text === "> work 1w 1p")?.attributes,
+    ).toBe(createTextAttributes({ bold: true }))
+    expect(
+      output.chunks.find((chunk) => chunk.text === "* notes 1w 1p")?.attributes,
+    ).toBe(0)
   })
 })
 
@@ -47,6 +49,7 @@ function session(overrides: Partial<TmuxSession> = {}): TmuxSession {
     id: "$1",
     name: "default",
     windows: 1,
+    panes: 1,
     attached: false,
     createdAt: new Date(0),
     activityAt: new Date(0),

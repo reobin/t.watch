@@ -16,13 +16,15 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
     const result = await runTmux(["list-sessions", "-F", sessionFormat])
 
     if (result.exitCode === 0) {
+      const paneCounts = await listPaneCounts()
+
       return {
         ok: true,
         sessions: result.stdout
           .trim()
           .split(/\r?\n/)
           .filter(Boolean)
-          .map(parseSession),
+          .map((line) => parseSession(line, paneCounts)),
       }
     }
 
@@ -46,7 +48,22 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
   }
 }
 
-function parseSession(line: string): TmuxSession {
+async function listPaneCounts(): Promise<Map<string, number>> {
+  const result = await runTmux(["list-panes", "-a", "-F", "#{session_id}"])
+  const paneCounts = new Map<string, number>()
+
+  if (result.exitCode !== 0) {
+    return paneCounts
+  }
+
+  for (const sessionId of result.stdout.trim().split(/\r?\n/).filter(Boolean)) {
+    paneCounts.set(sessionId, (paneCounts.get(sessionId) ?? 0) + 1)
+  }
+
+  return paneCounts
+}
+
+function parseSession(line: string, paneCounts: Map<string, number>): TmuxSession {
   const [id, name, windows, attached, createdAt, activityAt] =
     line.split(sessionSeparator)
 
@@ -54,6 +71,7 @@ function parseSession(line: string): TmuxSession {
     id: id ?? "",
     name: name ?? "",
     windows: Number(windows),
+    panes: paneCounts.get(id ?? "") ?? 0,
     attached: Number(attached) > 0,
     createdAt: new Date(Number(createdAt) * 1000),
     activityAt: new Date(Number(activityAt) * 1000),
