@@ -7,7 +7,9 @@ const palette = {
   green: 2,
   magenta: 5,
   cyan: 6,
+  brightCyan: 14,
   gray: 8,
+  selectedBg: 235,
 } as const;
 
 export function renderLoading(): string {
@@ -22,26 +24,35 @@ export function renderNoSessions(): string {
   return renderMessage("No tmux sessions running.");
 }
 
-export function renderSessions(sessions: TmuxSession[]): StyledText {
+export function renderSessions(
+  sessions: TmuxSession[],
+  selectedPaneId?: string,
+  showSelectedPane = false,
+): StyledText {
   return new StyledText([
     bold(title),
     textChunk("\n\n"),
     ...sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
-      ...renderSession(session),
+      ...renderSession(session, selectedPaneId, showSelectedPane),
     ]),
   ]);
 }
 
-function renderSession(session: TmuxSession): TextChunk[] {
+function renderSession(
+  session: TmuxSession,
+  selectedPaneId: string | undefined,
+  showSelectedPane: boolean,
+): TextChunk[] {
   const marker = session.attached ? "●" : "○";
   const header = `${marker} ${session.name}${session.sshAttached ? " <ssh>" : ""}`;
   const chunks: TextChunk[] = [renderSessionHeader(header, session)];
 
   session.windows.forEach((window) => {
     window.panes.forEach((pane, paneIndex) => {
+      const isSelected = showSelectedPane && pane.id === selectedPaneId;
       const branch = windowPaneBranch(window.panes.length, paneIndex);
-      chunks.push(
+      const rowChunks = [
         muted("\n  "),
         muted(branch),
         ...renderPaneName(
@@ -49,7 +60,9 @@ function renderSession(session: TmuxSession): TextChunk[] {
           session.attached && window.active && pane.active,
           session.sshAttached,
         ),
-      );
+      ];
+
+      chunks.push(...(isSelected ? selectedRow(rowChunks) : rowChunks));
     });
   });
 
@@ -130,6 +143,27 @@ function statusLabel(status: TmuxPaneIntegrationStatus): string {
 
 function active(text: string): TextChunk {
   return bold(terminalFg(palette.cyan, text));
+}
+
+function selectedRow(chunks: TextChunk[]): TextChunk[] {
+  return chunks.map((chunk, index) => {
+    if (index === 0) {
+      return selected({
+        ...chunk,
+        text: "\n▎ ",
+        fg: RGBA.fromIndex(palette.brightCyan),
+      });
+    }
+
+    return selected(chunk);
+  });
+}
+
+function selected(chunk: TextChunk): TextChunk {
+  return {
+    ...chunk,
+    bg: RGBA.fromIndex(palette.selectedBg),
+  };
 }
 
 function muted(text: string): TextChunk {

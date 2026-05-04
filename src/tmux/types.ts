@@ -69,3 +69,16 @@ export type TmuxSessionWatchResult =
       ok: false;
       message: string;
     };
+
+export type TmuxClient = {
+  target: string;
+};
+
+export type TmuxFocusPaneResult =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
