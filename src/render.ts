@@ -20,15 +20,27 @@ export function renderSessions(sessions: TmuxSession[]): StyledText {
     textChunk(`${title}\n\nSessions\n\n`),
     ...sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
-      renderSession(session),
+      ...renderSession(session),
     ]),
   ])
 }
 
-function renderSession(session: TmuxSession): TextChunk {
-  const content = `${session.attached ? ">" : "*"} ${session.name} ${session.windows}w ${session.panes}p`
+function renderSession(session: TmuxSession): TextChunk[] {
+  const marker = session.attached ? ">" : "*"
+  const header = `${marker} ${session.name}`
+  const chunks: TextChunk[] = [
+    session.attached ? bold(header) : textChunk(header),
+  ]
 
-  return session.attached ? bold(content) : textChunk(content)
+  for (const window of session.windows) {
+    chunks.push(textChunk(`\n  ${window.index} ${window.name}`))
+
+    for (const pane of window.panes) {
+      chunks.push(textChunk(`\n    ${pane.processName}`))
+    }
+  }
+
+  return chunks
 }
 
 function textChunk(text: string): TextChunk {

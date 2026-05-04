@@ -11,11 +11,26 @@ export type TmuxCheckResult =
 export type TmuxSession = {
   id: string
   name: string
-  windows: number
-  panes: number
+  windows: TmuxWindow[]
   attached: boolean
   createdAt: Date
   activityAt: Date
+}
+
+export type TmuxWindow = {
+  id: string
+  index: number
+  name: string
+  active: boolean
+  panes: TmuxPane[]
+}
+
+export type TmuxPane = {
+  id: string
+  index: number
+  command: string
+  title: string
+  processName: string
 }
 
 export type TmuxSessionsResult =

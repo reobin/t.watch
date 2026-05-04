@@ -35,10 +35,7 @@ export async function startApp(): Promise<void> {
   if (tmux.ok === true) {
     await ensureSessionWatcher()
     await refreshSessions()
-
-    if (!sessionWatcher) {
-      startRefreshPolling()
-    }
+    startRefreshPolling()
   } else {
     screen.setContent(renderMessage(tmux.message))
   }
@@ -68,11 +65,6 @@ export async function startApp(): Promise<void> {
 
       if (result.ok === true) {
         sessionWatcher = result.watcher
-
-        if (refreshTimer) {
-          clearInterval(refreshTimer)
-          refreshTimer = undefined
-        }
       }
     } finally {
       isStartingWatcher = false

@@ -12,13 +12,32 @@ describe("listSessions", () => {
         {
           exitCode: 0,
           stdout: [
-            ["$1", "work", "3", "2", "1700000000", "1700000100"].join("\x1f"),
-            ["$2", "notes", "1", "0", "1700000200", "1700000300"].join("\x1f"),
+            ["$1", "work", "2", "1700000000", "1700000100"].join("\x1f"),
+            ["$2", "notes", "0", "1700000200", "1700000300"].join("\x1f"),
           ].join("\n"),
         },
         {
           exitCode: 0,
-          stdout: ["$1", "$1", "$1", "$1", "$2"].join("\n"),
+          stdout: [
+            ["$1", "@1", "1", "node", "1"].join("\x1f"),
+            ["$1", "@2", "2", "shell", "0"].join("\x1f"),
+            ["$2", "@3", "1", "notes", "1"].join("\x1f"),
+          ].join("\n"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            ["$1", "@1", "%1", "1", "node", "10", "OC | Coding"].join("\x1f"),
+            ["$1", "@2", "%2", "1", "bash", "20", "shell"].join("\x1f"),
+            ["$2", "@3", "%3", "1", "vim", "30", "notes"].join("\x1f"),
+          ].join("\n"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            "100 10 node node /home/reobin/.local/bin/opencode",
+            "200 20 bash -bash",
+          ].join("\n"),
         },
       ],
     })
@@ -29,8 +48,38 @@ describe("listSessions", () => {
         {
           id: "$1",
           name: "work",
-          windows: 3,
-          panes: 4,
+          windows: [
+            {
+              id: "@1",
+              index: 1,
+              name: "node",
+              active: true,
+              panes: [
+                {
+                  id: "%1",
+                  index: 1,
+                  command: "node",
+                  title: "OC | Coding",
+                  processName: "opencode",
+                },
+              ],
+            },
+            {
+              id: "@2",
+              index: 2,
+              name: "shell",
+              active: false,
+              panes: [
+                {
+                  id: "%2",
+                  index: 1,
+                  command: "bash",
+                  title: "shell",
+                  processName: "bash",
+                },
+              ],
+            },
+          ],
           attached: true,
           createdAt: new Date(1700000000 * 1000),
           activityAt: new Date(1700000100 * 1000),
@@ -38,8 +87,23 @@ describe("listSessions", () => {
         {
           id: "$2",
           name: "notes",
-          windows: 1,
-          panes: 1,
+          windows: [
+            {
+              id: "@3",
+              index: 1,
+              name: "notes",
+              active: true,
+              panes: [
+                {
+                  id: "%3",
+                  index: 1,
+                  command: "vim",
+                  title: "notes",
+                  processName: "vim",
+                },
+              ],
+            },
+          ],
           attached: false,
           createdAt: new Date(1700000200 * 1000),
           activityAt: new Date(1700000300 * 1000),
@@ -52,9 +116,23 @@ describe("listSessions", () => {
         "tmux",
         "list-sessions",
         "-F",
-        "#{session_id}\x1f#{session_name}\x1f#{session_windows}\x1f#{session_attached}\x1f#{session_created}\x1f#{session_activity}",
+        "#{session_id}\x1f#{session_name}\x1f#{session_attached}\x1f#{session_created}\x1f#{session_activity}",
       ],
-      ["tmux", "list-panes", "-a", "-F", "#{session_id}"],
+      [
+        "tmux",
+        "list-windows",
+        "-a",
+        "-F",
+        "#{session_id}\x1f#{window_id}\x1f#{window_index}\x1f#{window_name}\x1f#{window_active}",
+      ],
+      [
+        "tmux",
+        "list-panes",
+        "-a",
+        "-F",
+        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}",
+      ],
+      ["ps", "-eo", "pid=,ppid=,comm=,args="],
     ])
   })
 
@@ -63,11 +141,16 @@ describe("listSessions", () => {
       results: [
         {
           exitCode: 0,
-          stdout: ["$1", "work", "3", "2", "1700000000", "1700000100"].join(
+          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join(
             "\x1f",
           ),
         },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
         { exitCode: 1, stderr: "pane listing failed" },
+        { exitCode: 0, stdout: "" },
       ],
     })
 
@@ -77,8 +160,15 @@ describe("listSessions", () => {
         {
           id: "$1",
           name: "work",
-          windows: 3,
-          panes: 0,
+          windows: [
+            {
+              id: "@1",
+              index: 1,
+              name: "work",
+              active: true,
+              panes: [],
+            },
+          ],
           attached: true,
           createdAt: new Date(1700000000 * 1000),
           activityAt: new Date(1700000100 * 1000),

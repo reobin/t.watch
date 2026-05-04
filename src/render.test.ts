@@ -25,21 +25,42 @@ describe("render", () => {
 
   test("renders session names", () => {
     const sessions: TmuxSession[] = [
-      session({ name: "work", attached: true }),
-      session({ name: "notes" }),
+      session({
+        name: "work",
+        attached: true,
+        windows: [
+          window({
+            name: "node",
+            panes: [pane({ processName: "opencode" })],
+          }),
+        ],
+      }),
+      session({
+        name: "notes",
+        windows: [window({ name: "vim", panes: [pane({ processName: "vim" })] })],
+      }),
     ]
     const output = renderSessions(sessions)
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
-      ["t.watch", "", "Sessions", "", "> work 1w 1p", "* notes 1w 1p"].join(
-        "\n",
-      ),
+      [
+        "t.watch",
+        "",
+        "Sessions",
+        "",
+        "> work",
+        "  1 node",
+        "    opencode",
+        "* notes",
+        "  1 vim",
+        "    vim",
+      ].join("\n"),
     )
     expect(
-      output.chunks.find((chunk) => chunk.text === "> work 1w 1p")?.attributes,
+      output.chunks.find((chunk) => chunk.text === "> work")?.attributes,
     ).toBe(createTextAttributes({ bold: true }))
     expect(
-      output.chunks.find((chunk) => chunk.text === "* notes 1w 1p")?.attributes,
+      output.chunks.find((chunk) => chunk.text === "* notes")?.attributes,
     ).toBe(0)
   })
 })
@@ -48,11 +69,34 @@ function session(overrides: Partial<TmuxSession> = {}): TmuxSession {
   return {
     id: "$1",
     name: "default",
-    windows: 1,
-    panes: 1,
+    windows: [],
     attached: false,
     createdAt: new Date(0),
     activityAt: new Date(0),
+    ...overrides,
+  }
+}
+
+function window(overrides: Partial<TmuxSession["windows"][number]> = {}) {
+  return {
+    id: "@1",
+    index: 1,
+    name: "default",
+    active: true,
+    panes: [],
+    ...overrides,
+  }
+}
+
+function pane(
+  overrides: Partial<TmuxSession["windows"][number]["panes"][number]> = {},
+) {
+  return {
+    id: "%1",
+    index: 1,
+    command: "bash",
+    title: "bash",
+    processName: "bash",
     ...overrides,
   }
 }
