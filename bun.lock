@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@reobin/t.watch",
+      "name": "thud.sh",
       "dependencies": {
         "@opentui/core": "^0.2.2",
       },
