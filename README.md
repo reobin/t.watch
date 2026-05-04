@@ -6,6 +6,15 @@ It shows running tmux sessions, windows, panes, and optional pane status from in
 
 ## Usage
 
+Install globally from npm:
+
+```sh
+npm install -g t.watch
+t.watch
+```
+
+Or run from source:
+
 ```sh
 bun install
 bun run start
@@ -15,6 +24,20 @@ Run tests:
 
 ```sh
 bun test
+```
+
+Build and inspect the npm package:
+
+```sh
+bun run build
+npm pack --dry-run
+```
+
+Publish:
+
+```sh
+npm login
+npm publish
 ```
 
 ## OpenCode Integration

@@ -3,10 +3,17 @@
   "version": "0.0.0",
   "type": "module",
   "bin": {
-    "t.watch": "./src/index.ts"
+    "t.watch": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "integrations",
+    "README.md"
+  ],
   "scripts": {
     "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outdir=dist && chmod +x dist/index.js",
+    "prepack": "bun run build",
     "test": "bun test",
     "test:unit": "bun test"
   },
