@@ -77,6 +77,16 @@ export const TWatchStatus = async ({ $ }: OpenCodePluginContext) => {
 
       if (event.type === "permission.replied") {
         await setStatus("working")
+        return
+      }
+
+      if (event.type === "question.asked") {
+        await setStatus("requesting")
+        return
+      }
+
+      if (event.type === "question.replied" || event.type === "question.rejected") {
+        await setStatus("working")
       }
     },
   }
