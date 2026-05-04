@@ -54,7 +54,7 @@ function parseSession(line: string): TmuxSession {
     id: id ?? "",
     name: name ?? "",
     windows: Number(windows),
-    attached: attached === "1",
+    attached: Number(attached) > 0,
     createdAt: new Date(Number(createdAt) * 1000),
     activityAt: new Date(Number(activityAt) * 1000),
   }

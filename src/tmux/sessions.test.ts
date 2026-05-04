@@ -10,7 +10,7 @@ describe("listSessions", () => {
     const calls = mockTmux({
       exitCode: 0,
       stdout: [
-        ["$1", "work", "3", "1", "1700000000", "1700000100"].join("\x1f"),
+        ["$1", "work", "3", "2", "1700000000", "1700000100"].join("\x1f"),
         ["$2", "notes", "1", "0", "1700000200", "1700000300"].join("\x1f"),
       ].join("\n"),
     })

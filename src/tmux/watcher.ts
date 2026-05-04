@@ -5,6 +5,9 @@ const sessionChangeHooks = [
   "session-created",
   "session-closed",
   "session-renamed",
+  "client-attached",
+  "client-detached",
+  "client-session-changed",
 ] as const
 
 export async function watchSessions(

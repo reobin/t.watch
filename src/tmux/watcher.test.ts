@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { watchSessions } from "./watcher"
 
-const hooks = ["session-created", "session-closed", "session-renamed"] as const
+const hooks = [
+  "session-created",
+  "session-closed",
+  "session-renamed",
+  "client-attached",
+  "client-detached",
+  "client-session-changed",
+] as const
 
 describe("watchSessions", () => {
   afterEach(() => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createTextAttributes } from "@opentui/core"
 import {
   renderLoading,
   renderMessage,
@@ -24,12 +25,19 @@ describe("render", () => {
 
   test("renders session names", () => {
     const sessions: TmuxSession[] = [
-      session({ name: "work" }),
+      session({ name: "work", attached: true }),
       session({ name: "notes" }),
     ]
+    const output = renderSessions(sessions)
 
-    expect(renderSessions(sessions)).toBe(
-      ["t.watch", "", "Sessions", "", "* work", "* notes"].join("\n"),
+    expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
+      ["t.watch", "", "Sessions", "", "> work", "* notes"].join("\n"),
+    )
+    expect(output.chunks.find((chunk) => chunk.text === "> work")?.attributes).toBe(
+      createTextAttributes({ bold: true }),
+    )
+    expect(output.chunks.find((chunk) => chunk.text === "* notes")?.attributes).toBe(
+      0,
     )
   })
 })
