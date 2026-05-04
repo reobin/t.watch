@@ -33,7 +33,11 @@ describe("render", () => {
             index: 1,
             name: "node",
             panes: [
-              pane({ processName: "opencode", active: true }),
+              pane({
+                processName: "opencode",
+                active: true,
+                integration: { tool: "opencode", status: "working" },
+              }),
               pane({ processName: "bash", active: false }),
             ],
           }),
@@ -57,7 +61,7 @@ describe("render", () => {
         "t.watch",
         "",
         "● work",
-        "  ╭─ opencode",
+        "  ╭─ opencode [Working]",
         "  ╰─ bash",
         "  ╶─ bun",
         "○ notes",
@@ -73,6 +77,9 @@ describe("render", () => {
     expect(
       output.chunks.find((chunk) => chunk.text === " opencode")?.attributes,
     ).toBe(createTextAttributes({ bold: true }))
+    expect(
+      output.chunks.find((chunk) => chunk.text === "[Working]")?.bg,
+    ).toBeDefined()
     expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg).toBeDefined()
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node")
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server")

@@ -26,9 +26,10 @@ describe("watchSessions", () => {
     const kill = mock()
 
     spyOn(Bun, "spawn").mockImplementation((command) => {
-      calls.push([...command])
+      const args = Array.isArray(command) ? command : command.cmd
+      calls.push([...args])
 
-      if (command[1] === "wait-for") {
+      if (args[1] === "wait-for") {
         return processResult({ exited: wait.promise, kill })
       }
 
@@ -56,9 +57,10 @@ describe("watchSessions", () => {
     const calls: string[][] = []
 
     spyOn(Bun, "spawn").mockImplementation((command) => {
-      calls.push([...command])
+      const args = Array.isArray(command) ? command : command.cmd
+      calls.push([...args])
 
-      if (command[3] === hookTarget("session-closed")) {
+      if (args[3] === hookTarget("session-closed")) {
         return processResult({ exited: Promise.resolve(1), stderr: "set-hook failed" })
       }
 
@@ -82,9 +84,10 @@ describe("watchSessions", () => {
     const onStop = mock()
 
     spyOn(Bun, "spawn").mockImplementation((command) => {
-      calls.push([...command])
+      const args = Array.isArray(command) ? command : command.cmd
+      calls.push([...args])
 
-      if (command[1] === "wait-for") {
+      if (args[1] === "wait-for") {
         return processResult({ exited: Promise.resolve(1), stderr: "wait failed" })
       }
 
@@ -161,7 +164,7 @@ function processResult(options: {
     kill: options.kill ?? mock(),
     stderr: options.stderr ?? "",
     stdout: options.stdout ?? "",
-  } as ReturnType<typeof Bun.spawn>
+  } as unknown as ReturnType<typeof Bun.spawn>
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {

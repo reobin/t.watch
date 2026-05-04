@@ -27,12 +27,34 @@ describe("listSessions", () => {
         {
           exitCode: 0,
           stdout: [
-            ["$1", "@1", "%1", "1", "1", "node", "10", "OC | Coding"].join(
-              "\x1f",
-            ),
-            ["$1", "@2", "%2", "1", "1", "bash", "20", "shell"].join(
-              "\x1f",
-            ),
+            [
+              "$1",
+              "@1",
+              "%1",
+              "1",
+              "1",
+              "node",
+              "10",
+              "OC | Coding",
+              "opencode",
+              "working",
+              "Coding",
+              "1700000110",
+            ].join("\x1f"),
+            [
+              "$1",
+              "@2",
+              "%2",
+              "1",
+              "1",
+              "bash",
+              "20",
+              "shell",
+              "opencode",
+              "idle",
+              "",
+              "1700000120",
+            ].join("\x1f"),
             ["$2", "@3", "%3", "1", "1", "vim", "30", "notes"].join(
               "\x1f",
             ),
@@ -68,6 +90,12 @@ describe("listSessions", () => {
                   command: "node",
                   title: "OC | Coding",
                   processName: "opencode",
+                  integration: {
+                    tool: "opencode",
+                    status: "working",
+                    label: "Coding",
+                    updatedAt: new Date(1700000110 * 1000),
+                  },
                 },
               ],
             },
@@ -139,7 +167,7 @@ describe("listSessions", () => {
         "list-panes",
         "-a",
         "-F",
-        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}",
+        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@t_watch_tool}\x1f#{@t_watch_status}\x1f#{@t_watch_status_label}\x1f#{@t_watch_status_updated_at}",
       ],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
     ])
@@ -253,14 +281,15 @@ function mockTmux(input: {
   ]
 
   spyOn(Bun, "spawn").mockImplementation((command) => {
-    calls.push([...command])
+    const args = Array.isArray(command) ? command : command.cmd
+    calls.push([...args])
     const result = results[Math.min(calls.length - 1, results.length - 1)]
 
     return {
       exited: Promise.resolve(result.exitCode),
       stderr: result.stderr ?? "",
       stdout: result.stdout ?? "",
-    } as ReturnType<typeof Bun.spawn>
+    } as unknown as ReturnType<typeof Bun.spawn>
   })
 
   return calls

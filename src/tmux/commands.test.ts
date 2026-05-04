@@ -60,13 +60,14 @@ function mockTmux(result: {
   const calls: string[][] = []
 
   spyOn(Bun, "spawn").mockImplementation((command) => {
-    calls.push([...command])
+    const args = Array.isArray(command) ? command : command.cmd
+    calls.push([...args])
 
     return {
       exited: Promise.resolve(result.exitCode),
       stderr: result.stderr ?? "",
       stdout: result.stdout ?? "",
-    } as ReturnType<typeof Bun.spawn>
+    } as unknown as ReturnType<typeof Bun.spawn>
   })
 
   return calls

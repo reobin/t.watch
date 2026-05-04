@@ -1,5 +1,11 @@
 import { missingTmuxMessage, runTmux } from "./commands"
-import type { TmuxPane, TmuxSession, TmuxSessionsResult, TmuxWindow } from "./types"
+import type {
+  TmuxPane,
+  TmuxPaneIntegrationStatus,
+  TmuxSession,
+  TmuxSessionsResult,
+  TmuxWindow,
+} from "./types"
 
 const sessionSeparator = "\x1f"
 const fieldSeparator = "\x1f"
@@ -26,6 +32,10 @@ const paneFormat = [
   "#{pane_current_command}",
   "#{pane_pid}",
   "#{pane_title}",
+  "#{@t_watch_tool}",
+  "#{@t_watch_status}",
+  "#{@t_watch_status_label}",
+  "#{@t_watch_status_updated_at}",
 ].join(fieldSeparator)
 
 type PaneRecord = TmuxPane & {
@@ -85,7 +95,7 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
   }
 }
 
-async function listWindows(): Promise<TmuxWindow[]> {
+async function listWindows(): Promise<Array<TmuxWindow & { sessionId: string }>> {
   const result = await runTmux(["list-windows", "-a", "-F", windowFormat])
 
   if (result.exitCode !== 0) {
@@ -123,7 +133,7 @@ async function listProcesses(): Promise<ProcessInfo[]> {
 
   const [exitCode, stdout] = await Promise.all([
     psProcess.exited,
-    new Response(psProcess.stdout).text(),
+    new Response(psProcess.stdout as ReadableStream<Uint8Array>).text(),
   ])
 
   if (exitCode !== 0) {
@@ -163,8 +173,27 @@ function parseWindow(line: string): TmuxWindow & { sessionId: string } {
 }
 
 function parsePane(line: string): PaneRecord {
-  const [sessionId, windowId, id, index, active, command, pid, title] =
-    line.split(fieldSeparator)
+  const [
+    sessionId,
+    windowId,
+    id,
+    index,
+    active,
+    command,
+    pid,
+    title,
+    integrationTool,
+    integrationStatus,
+    integrationLabel,
+    integrationUpdatedAt,
+  ] = line.split(fieldSeparator)
+
+  const integration = parsePaneIntegration(
+    integrationTool,
+    integrationStatus,
+    integrationLabel,
+    integrationUpdatedAt,
+  )
 
   return {
     sessionId: sessionId ?? "",
@@ -176,7 +205,48 @@ function parsePane(line: string): PaneRecord {
     title: title ?? "",
     pid: Number(pid),
     processName: command ?? "",
+    ...(integration ? { integration } : {}),
   }
+}
+
+function parsePaneIntegration(
+  tool: string | undefined,
+  status: string | undefined,
+  label: string | undefined,
+  updatedAt: string | undefined,
+): PaneRecord["integration"] {
+  const parsedStatus = parsePaneIntegrationStatus(status)
+
+  if (!tool && !parsedStatus) {
+    return undefined
+  }
+
+  const timestamp = Number(updatedAt)
+
+  return {
+    tool: tool || "unknown",
+    status: parsedStatus ?? "unknown",
+    label: label || undefined,
+    updatedAt: Number.isFinite(timestamp) && timestamp > 0
+      ? new Date(timestamp * 1000)
+      : undefined,
+  }
+}
+
+function parsePaneIntegrationStatus(
+  status: string | undefined,
+): TmuxPaneIntegrationStatus | undefined {
+  if (
+    status === "idle" ||
+    status === "working" ||
+    status === "waiting" ||
+    status === "error" ||
+    status === "unknown"
+  ) {
+    return status
+  }
+
+  return undefined
 }
 
 function parseProcess(line: string): ProcessInfo {
@@ -211,13 +281,19 @@ function groupPanesByWindow(
   for (const pane of panes) {
     const key = paneKey(pane.sessionId, pane.windowId)
     const windowPanes = panesByWindow.get(key) ?? []
+    const processName = resolvePaneProcessName(pane, processTree)
+    const integration = pane.integration?.tool === processName
+      ? pane.integration
+      : undefined
+
     windowPanes.push({
       id: pane.id,
       index: pane.index,
       active: pane.active,
       command: pane.command,
       title: pane.title,
-      processName: resolvePaneProcessName(pane, processTree),
+      processName,
+      ...(integration ? { integration } : {}),
     })
     panesByWindow.set(key, windowPanes)
   }

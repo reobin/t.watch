@@ -1,12 +1,19 @@
 import {
   StyledText,
+  bgBlack,
+  bgCyan,
+  bgGreen,
+  bgRed,
+  bgYellow,
+  black,
   bold,
   brightBlack,
   cyan,
   dim,
+  white,
   type TextChunk,
 } from "@opentui/core"
-import type { TmuxSession } from "./tmux"
+import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux"
 
 const title = "t.watch"
 
@@ -46,14 +53,63 @@ function renderSession(session: TmuxSession): TextChunk[] {
       chunks.push(
         muted("\n  "),
         muted(branch),
-        session.attached && window.active && pane.active
-          ? active(` ${pane.processName}`)
-          : textChunk(` ${pane.processName}`),
+        ...renderPaneName(pane, session.attached && window.active && pane.active),
       )
     })
   })
 
   return chunks
+}
+
+function renderPaneName(pane: TmuxPane, isActive: boolean): TextChunk[] {
+  return [
+    isActive ? active(` ${pane.processName}`) : textChunk(` ${pane.processName}`),
+    ...renderStatusPill(pane),
+  ]
+}
+
+function renderStatusPill(pane: TmuxPane): TextChunk[] {
+  const integration = pane.integration
+
+  if (!integration) {
+    return []
+  }
+
+  const label = integration.label ?? statusLabel(integration.status)
+
+  return [textChunk(" "), statusColor(integration.status)(`[${label}]`)]
+}
+
+function statusColor(
+  status: TmuxPaneIntegrationStatus,
+): (text: string) => TextChunk {
+  switch (status) {
+    case "idle":
+      return (text) => bold(bgGreen(black(text)))
+    case "working":
+      return (text) => bold(bgCyan(black(text)))
+    case "waiting":
+      return (text) => bold(bgYellow(black(text)))
+    case "error":
+      return (text) => bold(bgRed(white(text)))
+    case "unknown":
+      return (text) => dim(bgBlack(white(text)))
+  }
+}
+
+function statusLabel(status: TmuxPaneIntegrationStatus): string {
+  switch (status) {
+    case "idle":
+      return "Idle"
+    case "working":
+      return "Working"
+    case "waiting":
+      return "Waiting"
+    case "error":
+      return "Error"
+    case "unknown":
+      return "Unknown"
+  }
 }
 
 function active(text: string): TextChunk {

@@ -32,6 +32,21 @@ export type TmuxPane = {
   command: string
   title: string
   processName: string
+  integration?: TmuxPaneIntegration
+}
+
+export type TmuxPaneIntegrationStatus =
+  | "idle"
+  | "working"
+  | "waiting"
+  | "error"
+  | "unknown"
+
+export type TmuxPaneIntegration = {
+  tool: string
+  status: TmuxPaneIntegrationStatus
+  label?: string
+  updatedAt?: Date
 }
 
 export type TmuxSessionsResult =
