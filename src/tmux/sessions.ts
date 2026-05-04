@@ -37,6 +37,7 @@ const paneFormat = [
   "#{@thud_sh_status_label}",
   "#{@thud_sh_status_updated_at}",
 ].join(fieldSeparator)
+const clientFormat = ["#{session_id}", "#{client_pid}"].join(fieldSeparator)
 
 type PaneRecord = TmuxPane & {
   sessionId: string
@@ -51,17 +52,24 @@ type ProcessInfo = {
   args: string
 }
 
+type ClientRecord = {
+  sessionId: string
+  pid: number
+}
+
 export async function listSessions(): Promise<TmuxSessionsResult> {
   try {
     const result = await runTmux(["list-sessions", "-F", sessionFormat])
 
     if (result.exitCode === 0) {
-      const [windows, panes, processes] = await Promise.all([
+      const [windows, panes, clients, processes] = await Promise.all([
         listWindows(),
         listPanes(),
+        listClients(),
         listProcesses(),
       ])
       const processTree = createProcessTree(processes)
+      const sshAttachedSessions = listSshAttachedSessions(clients, processes)
       const panesByWindow = groupPanesByWindow(panes, processTree)
       const windowsBySession = groupWindowsBySession(windows, panesByWindow)
 
@@ -71,7 +79,7 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
           .trim()
           .split(/\r?\n/)
           .filter(Boolean)
-          .map((line) => parseSession(line, windowsBySession)),
+          .map((line) => parseSession(line, windowsBySession, sshAttachedSessions)),
       }
     }
 
@@ -119,6 +127,16 @@ async function listPanes(): Promise<PaneRecord[]> {
   return result.stdout.trim().split(/\r?\n/).filter(Boolean).map(parsePane)
 }
 
+async function listClients(): Promise<ClientRecord[]> {
+  const result = await runTmux(["list-clients", "-F", clientFormat])
+
+  if (result.exitCode !== 0) {
+    return []
+  }
+
+  return result.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseClient)
+}
+
 async function listProcesses(): Promise<ProcessInfo[]> {
   let psProcess: ReturnType<typeof Bun.spawn>
 
@@ -146,6 +164,7 @@ async function listProcesses(): Promise<ProcessInfo[]> {
 function parseSession(
   line: string,
   windowsBySession: Map<string, TmuxWindow[]>,
+  sshAttachedSessions: Set<string>,
 ): TmuxSession {
   const [id, name, attached, createdAt, activityAt] = line.split(sessionSeparator)
 
@@ -154,8 +173,18 @@ function parseSession(
     name: name ?? "",
     windows: windowsBySession.get(id ?? "") ?? [],
     attached: Number(attached) > 0,
+    sshAttached: sshAttachedSessions.has(id ?? ""),
     createdAt: new Date(Number(createdAt) * 1000),
     activityAt: new Date(Number(activityAt) * 1000),
+  }
+}
+
+function parseClient(line: string): ClientRecord {
+  const [sessionId, pid] = line.split(fieldSeparator)
+
+  return {
+    sessionId: sessionId ?? "",
+    pid: Number(pid),
   }
 }
 
@@ -272,6 +301,54 @@ function createProcessTree(processes: ProcessInfo[]): Map<number, ProcessInfo[]>
   return tree
 }
 
+function listSshAttachedSessions(
+  clients: ClientRecord[],
+  processes: ProcessInfo[],
+): Set<string> {
+  const processesByPid = new Map(
+    processes.map((processInfo) => [processInfo.pid, processInfo]),
+  )
+  const localAttachedSessions = new Set<string>()
+  const sessions = new Set<string>()
+
+  for (const client of clients) {
+    if (hasSshAncestor(client.pid, processesByPid)) {
+      sessions.add(client.sessionId)
+    } else {
+      localAttachedSessions.add(client.sessionId)
+    }
+  }
+
+  for (const sessionId of localAttachedSessions) {
+    sessions.delete(sessionId)
+  }
+
+  return sessions
+}
+
+function hasSshAncestor(
+  pid: number,
+  processesByPid: Map<number, ProcessInfo>,
+): boolean {
+  let processInfo = processesByPid.get(pid)
+  const seen = new Set<number>()
+
+  while (processInfo && !seen.has(processInfo.pid)) {
+    if (isSshdCommand(processInfo.command)) {
+      return true
+    }
+
+    seen.add(processInfo.pid)
+    processInfo = processesByPid.get(processInfo.ppid)
+  }
+
+  return false
+}
+
+function isSshdCommand(command: string): boolean {
+  return basename(command).startsWith("sshd")
+}
+
 function groupPanesByWindow(
   panes: PaneRecord[],
   processTree: Map<number, ProcessInfo[]>,
@@ -293,6 +370,7 @@ function groupPanesByWindow(
       command: pane.command,
       title: pane.title,
       processName,
+      ssh: isSshPane(pane, processTree),
       ...(integration ? { integration } : {}),
     })
     panesByWindow.set(key, windowPanes)
@@ -328,6 +406,19 @@ function groupWindowsBySession(
   }
 
   return windowsBySession
+}
+
+function isSshPane(
+  pane: PaneRecord,
+  processTree: Map<number, ProcessInfo[]>,
+): boolean {
+  if (basename(pane.command) === "ssh") {
+    return true
+  }
+
+  return listDescendants(pane.pid, processTree).some(
+    (processInfo) => basename(processInfo.command) === "ssh",
+  )
 }
 
 function resolvePaneProcessName(

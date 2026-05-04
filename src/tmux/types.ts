@@ -13,6 +13,7 @@ export type TmuxSession = {
   name: string
   windows: TmuxWindow[]
   attached: boolean
+  sshAttached: boolean
   createdAt: Date
   activityAt: Date
 }
@@ -32,6 +33,7 @@ export type TmuxPane = {
   command: string
   title: string
   processName: string
+  ssh: boolean
   integration?: TmuxPaneIntegration
 }
 

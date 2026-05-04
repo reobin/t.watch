@@ -60,6 +60,7 @@ describe("listSessions", () => {
             ),
           ].join("\n"),
         },
+        { exitCode: 0, stdout: "" },
         {
           exitCode: 0,
           stdout: [
@@ -90,6 +91,7 @@ describe("listSessions", () => {
                   command: "node",
                   title: "OC | Coding",
                   processName: "opencode",
+                  ssh: false,
                   integration: {
                     tool: "opencode",
                     status: "requesting",
@@ -111,11 +113,13 @@ describe("listSessions", () => {
                   command: "bash",
                   title: "shell",
                   processName: "bash",
+                  ssh: false,
                 },
               ],
             },
           ],
           attached: true,
+          sshAttached: false,
           createdAt: new Date(1700000000 * 1000),
           activityAt: new Date(1700000100 * 1000),
         },
@@ -136,11 +140,13 @@ describe("listSessions", () => {
                   command: "vim",
                   title: "notes",
                   processName: "vim",
+                  ssh: false,
                 },
               ],
             },
           ],
           attached: false,
+          sshAttached: false,
           createdAt: new Date(1700000200 * 1000),
           activityAt: new Date(1700000300 * 1000),
         },
@@ -168,8 +174,139 @@ describe("listSessions", () => {
         "-F",
         "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@thud_sh_tool}\x1f#{@thud_sh_status}\x1f#{@thud_sh_status_label}\x1f#{@thud_sh_status_updated_at}",
       ],
+      ["tmux", "list-clients", "-F", "#{session_id}\x1f#{client_pid}"],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
     ])
+  })
+
+  test("detects sessions attached through ssh", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
+            "\x1f",
+          ),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "30"].join("\x1f") },
+        {
+          exitCode: 0,
+          stdout: [
+            "10 1 sshd-session sshd-session: reobin [priv]",
+            "20 10 bash -bash",
+            "30 20 tmux tmux attach",
+          ].join("\n"),
+        },
+      ],
+    })
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          name: "work",
+          attached: true,
+          sshAttached: true,
+        },
+      ],
+    })
+  })
+
+  test("keeps local coloring when a session also has a local client", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join(
+            "\x1f",
+          ),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "" },
+        {
+          exitCode: 0,
+          stdout: [["$1", "30"].join("\x1f"), ["$1", "40"].join("\x1f")]
+            .join("\n"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            "10 1 sshd-session sshd-session: reobin [priv]",
+            "20 10 bash -bash",
+            "30 20 tmux tmux attach",
+            "40 1 tmux tmux attach",
+          ].join("\n"),
+        },
+      ],
+    })
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          name: "work",
+          attached: true,
+          sshAttached: false,
+        },
+      ],
+    })
+  })
+
+  test("detects panes opened through ssh", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
+            "\x1f",
+          ),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            ["$1", "@1", "%1", "1", "1", "bash", "40", "shell"].join(
+              "\x1f",
+            ),
+            ["$1", "@1", "%2", "2", "0", "bash", "60", "shell"].join(
+              "\x1f",
+            ),
+          ].join("\n"),
+        },
+        { exitCode: 0, stdout: "" },
+        {
+          exitCode: 0,
+          stdout: ["50 40 ssh ssh server.example.com"].join("\n"),
+        },
+      ],
+    })
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  processName: "ssh",
+                  ssh: true,
+                },
+                {
+                  processName: "bash",
+                  ssh: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
   })
 
   test("uses zero panes when pane listing fails", async () => {
@@ -186,6 +323,7 @@ describe("listSessions", () => {
           stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
         },
         { exitCode: 1, stderr: "pane listing failed" },
+        { exitCode: 0, stdout: "" },
         { exitCode: 0, stdout: "" },
       ],
     })
@@ -206,6 +344,7 @@ describe("listSessions", () => {
             },
           ],
           attached: true,
+          sshAttached: false,
           createdAt: new Date(1700000000 * 1000),
           activityAt: new Date(1700000100 * 1000),
         },
@@ -243,6 +382,7 @@ describe("listSessions", () => {
             "1700000110",
           ].join("\x1f"),
         },
+        { exitCode: 0, stdout: "" },
         {
           exitCode: 0,
           stdout: "100 10 node node /home/reobin/.local/bin/opencode",
@@ -290,6 +430,7 @@ describe("listSessions", () => {
             "\x1f",
           ),
         },
+        { exitCode: 0, stdout: "" },
         {
           exitCode: 0,
           stdout: "400 40 lazygit lazygit",
@@ -317,11 +458,13 @@ describe("listSessions", () => {
                   command: "nvim",
                   title: "node thread",
                   processName: "nvim",
+                  ssh: false,
                 },
               ],
             },
           ],
           attached: true,
+          sshAttached: false,
           createdAt: new Date(1700000000 * 1000),
           activityAt: new Date(1700000100 * 1000),
         },
