@@ -33,12 +33,15 @@ bun run build
 npm pack --dry-run
 ```
 
-Publish:
+Publish a release:
 
 ```sh
-npm login
-npm publish
+npm version patch
+git push
+git push --tags
 ```
+
+The pushed version tag triggers GitHub Actions to test, build, pack, and publish the package to npm with provenance.
 
 ## OpenCode Integration
 
