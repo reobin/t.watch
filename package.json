@@ -6,6 +6,9 @@
     "thud.sh": "dist/index.js",
     "thud": "dist/index.js"
   },
+  "exports": {
+    "./server": "./integrations/opencode/thud-sh-status.ts"
+  },
   "files": [
     "dist",
     "integrations",

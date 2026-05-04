@@ -45,4 +45,8 @@ The pushed version tag triggers GitHub Actions to test, build, pack, and publish
 
 ## OpenCode Integration
 
-Load `integrations/opencode/thud-sh-status.ts` as an OpenCode plugin to publish pane status into tmux options for `thud.sh`.
+Add the plugin so OpenCode can publish its pane status into tmux for `thud.sh` to display:
+
+```sh
+opencode plugin thud.sh
+```
