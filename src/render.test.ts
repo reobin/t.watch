@@ -54,7 +54,7 @@ describe("render", () => {
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
-        "t.watch  2 sessions",
+        "t.watch",
         "",
         "● work",
         "  ╭─ opencode",

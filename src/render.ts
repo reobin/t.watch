@@ -23,11 +23,9 @@ export function renderNoSessions(): string {
 }
 
 export function renderSessions(sessions: TmuxSession[]): StyledText {
-  const sessionLabel = sessions.length === 1 ? "session" : "sessions"
-
   return new StyledText([
     bold(title),
-    muted(`  ${sessions.length} ${sessionLabel}\n\n`),
+    textChunk("\n\n"),
     ...sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
       ...renderSession(session),
