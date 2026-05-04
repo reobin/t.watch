@@ -16,7 +16,7 @@ describe("ThudShStatus", () => {
     expect(statuses(shell.calls)).toEqual(["idle", "requesting"])
   })
 
-  test("marks answered or dismissed OpenCode questions as working", async () => {
+  test("restores idle after answered or dismissed OpenCode questions", async () => {
     process.env.TMUX_PANE = "%1"
     const shell = mockShell()
     const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ })
@@ -28,8 +28,66 @@ describe("ThudShStatus", () => {
     expect(statuses(shell.calls)).toEqual([
       "idle",
       "requesting",
+      "idle",
+    ])
+  })
+
+  test("restores working after answered OpenCode questions while busy", async () => {
+    process.env.TMUX_PANE = "%1"
+    const shell = mockShell()
+    const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ })
+
+    await plugin.event({
+      event: { type: "session.status", properties: { status: { type: "busy" } } },
+    })
+    await plugin.event({ event: { type: "question.asked" } })
+    await plugin.event({ event: { type: "question.replied" } })
+
+    expect(statuses(shell.calls)).toEqual([
+      "idle",
       "working",
+      "requesting",
       "working",
+    ])
+  })
+
+  test("restores idle after dismissed OpenCode questions while busy", async () => {
+    process.env.TMUX_PANE = "%1"
+    const shell = mockShell()
+    const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ })
+
+    await plugin.event({
+      event: { type: "session.status", properties: { status: { type: "busy" } } },
+    })
+    await plugin.event({ event: { type: "question.asked" } })
+    await plugin.event({ event: { type: "question.rejected" } })
+
+    expect(statuses(shell.calls)).toEqual([
+      "idle",
+      "working",
+      "requesting",
+      "idle",
+    ])
+  })
+
+  test("restores idle after rejected OpenCode permissions while busy", async () => {
+    process.env.TMUX_PANE = "%1"
+    const shell = mockShell()
+    const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ })
+
+    await plugin.event({
+      event: { type: "session.status", properties: { status: { type: "busy" } } },
+    })
+    await plugin.event({ event: { type: "permission.asked" } })
+    await plugin.event({
+      event: { type: "permission.replied", properties: { reply: "reject" } },
+    })
+
+    expect(statuses(shell.calls)).toEqual([
+      "idle",
+      "working",
+      "requesting",
+      "idle",
     ])
   })
 })

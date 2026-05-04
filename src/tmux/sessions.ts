@@ -225,7 +225,7 @@ function parsePaneIntegration(
 
   return {
     tool: tool || "unknown",
-    status: parsedStatus ?? "working",
+    status: parsedStatus ?? "unknown",
     label: label || undefined,
     updatedAt: Number.isFinite(timestamp) && timestamp > 0
       ? new Date(timestamp * 1000)
