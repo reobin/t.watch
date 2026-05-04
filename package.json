@@ -1,9 +1,9 @@
 {
-  "name": "t.watch",
+  "name": "@reobin/t.watch",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "t.watch": "./dist/index.js"
+    "t.watch": "dist/index.js"
   },
   "files": [
     "dist",

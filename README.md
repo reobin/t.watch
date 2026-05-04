@@ -9,7 +9,7 @@ It shows running tmux sessions, windows, panes, and optional pane status from in
 Install globally from npm:
 
 ```sh
-npm install -g t.watch
+npm install -g @reobin/t.watch
 t.watch
 ```
 
