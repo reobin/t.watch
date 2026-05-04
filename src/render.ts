@@ -33,10 +33,20 @@ function renderSession(session: TmuxSession): TextChunk[] {
   ]
 
   for (const window of session.windows) {
-    chunks.push(textChunk(`\n  ${window.index} ${window.name}`))
+    const isCurrentWindow = session.attached && window.active
+    const windowText = `${isCurrentWindow ? ">" : "*"} ${window.index} ${window.name}`
+    chunks.push(
+      isCurrentWindow ? bold(`\n  ${windowText}`) : textChunk(`\n  ${windowText}`),
+    )
 
     for (const pane of window.panes) {
-      chunks.push(textChunk(`\n    ${pane.processName}`))
+      const isCurrentPane = isCurrentWindow && pane.active
+      const paneText = isCurrentPane
+        ? `> ${pane.processName}`
+        : pane.processName
+      chunks.push(
+        isCurrentPane ? bold(`\n    ${paneText}`) : textChunk(`\n    ${paneText}`),
+      )
     }
   }
 

@@ -27,9 +27,15 @@ describe("listSessions", () => {
         {
           exitCode: 0,
           stdout: [
-            ["$1", "@1", "%1", "1", "node", "10", "OC | Coding"].join("\x1f"),
-            ["$1", "@2", "%2", "1", "bash", "20", "shell"].join("\x1f"),
-            ["$2", "@3", "%3", "1", "vim", "30", "notes"].join("\x1f"),
+            ["$1", "@1", "%1", "1", "1", "node", "10", "OC | Coding"].join(
+              "\x1f",
+            ),
+            ["$1", "@2", "%2", "1", "1", "bash", "20", "shell"].join(
+              "\x1f",
+            ),
+            ["$2", "@3", "%3", "1", "1", "vim", "30", "notes"].join(
+              "\x1f",
+            ),
           ].join("\n"),
         },
         {
@@ -58,6 +64,7 @@ describe("listSessions", () => {
                 {
                   id: "%1",
                   index: 1,
+                  active: true,
                   command: "node",
                   title: "OC | Coding",
                   processName: "opencode",
@@ -73,6 +80,7 @@ describe("listSessions", () => {
                 {
                   id: "%2",
                   index: 1,
+                  active: true,
                   command: "bash",
                   title: "shell",
                   processName: "bash",
@@ -97,6 +105,7 @@ describe("listSessions", () => {
                 {
                   id: "%3",
                   index: 1,
+                  active: true,
                   command: "vim",
                   title: "notes",
                   processName: "vim",
@@ -130,7 +139,7 @@ describe("listSessions", () => {
         "list-panes",
         "-a",
         "-F",
-        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}",
+        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}",
       ],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
     ])

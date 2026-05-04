@@ -22,6 +22,7 @@ const paneFormat = [
   "#{window_id}",
   "#{pane_id}",
   "#{pane_index}",
+  "#{pane_active}",
   "#{pane_current_command}",
   "#{pane_pid}",
   "#{pane_title}",
@@ -162,7 +163,7 @@ function parseWindow(line: string): TmuxWindow & { sessionId: string } {
 }
 
 function parsePane(line: string): PaneRecord {
-  const [sessionId, windowId, id, index, command, pid, title] =
+  const [sessionId, windowId, id, index, active, command, pid, title] =
     line.split(fieldSeparator)
 
   return {
@@ -170,6 +171,7 @@ function parsePane(line: string): PaneRecord {
     windowId: windowId ?? "",
     id: id ?? "",
     index: Number(index),
+    active: Number(active) > 0,
     command: command ?? "",
     title: title ?? "",
     pid: Number(pid),
@@ -212,6 +214,7 @@ function groupPanesByWindow(
     windowPanes.push({
       id: pane.id,
       index: pane.index,
+      active: pane.active,
       command: pane.command,
       title: pane.title,
       processName: resolvePaneProcessName(pane, processTree),

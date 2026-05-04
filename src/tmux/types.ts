@@ -28,6 +28,7 @@ export type TmuxWindow = {
 export type TmuxPane = {
   id: string
   index: number
+  active: boolean
   command: string
   title: string
   processName: string

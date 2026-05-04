@@ -31,7 +31,10 @@ describe("render", () => {
         windows: [
           window({
             name: "node",
-            panes: [pane({ processName: "opencode" })],
+            panes: [
+              pane({ processName: "opencode", active: true }),
+              pane({ processName: "bash", active: false }),
+            ],
           }),
         ],
       }),
@@ -49,10 +52,11 @@ describe("render", () => {
         "Sessions",
         "",
         "> work",
-        "  1 node",
-        "    opencode",
+        "  > 1 node",
+        "    > opencode",
+        "    bash",
         "* notes",
-        "  1 vim",
+        "  * 1 vim",
         "    vim",
       ].join("\n"),
     )
@@ -62,6 +66,15 @@ describe("render", () => {
     expect(
       output.chunks.find((chunk) => chunk.text === "* notes")?.attributes,
     ).toBe(0)
+    expect(
+      output.chunks.find((chunk) => chunk.text === "\n  > 1 node")?.attributes,
+    ).toBe(createTextAttributes({ bold: true }))
+    expect(
+      output.chunks.find((chunk) => chunk.text === "\n    > opencode")?.attributes,
+    ).toBe(createTextAttributes({ bold: true }))
+    expect(output.chunks.map((chunk) => chunk.text).join("").match(/>/g)).toHaveLength(
+      3,
+    )
   })
 })
 
@@ -94,6 +107,7 @@ function pane(
   return {
     id: "%1",
     index: 1,
+    active: true,
     command: "bash",
     title: "bash",
     processName: "bash",
