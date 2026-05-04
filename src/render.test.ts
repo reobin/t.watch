@@ -30,11 +30,18 @@ describe("render", () => {
         attached: true,
         windows: [
           window({
+            index: 1,
             name: "node",
             panes: [
               pane({ processName: "opencode", active: true }),
               pane({ processName: "bash", active: false }),
             ],
+          }),
+          window({
+            index: 2,
+            name: "server",
+            active: false,
+            panes: [pane({ processName: "bun", active: true })],
           }),
         ],
       }),
@@ -47,34 +54,32 @@ describe("render", () => {
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
-        "t.watch",
+        "t.watch  2 sessions",
         "",
-        "Sessions",
-        "",
-        "> work",
-        "  > 1 node",
-        "    > opencode",
-        "    bash",
-        "* notes",
-        "  * 1 vim",
-        "    vim",
+        "● work",
+        "  ╭─ opencode",
+        "  ╰─ bash",
+        "  ╶─ bun",
+        "○ notes",
+        "  ╶─ vim",
       ].join("\n"),
     )
     expect(
-      output.chunks.find((chunk) => chunk.text === "> work")?.attributes,
+      output.chunks.find((chunk) => chunk.text === "● work")?.attributes,
     ).toBe(createTextAttributes({ bold: true }))
     expect(
-      output.chunks.find((chunk) => chunk.text === "* notes")?.attributes,
+      output.chunks.find((chunk) => chunk.text === "○ notes")?.attributes,
     ).toBe(0)
     expect(
-      output.chunks.find((chunk) => chunk.text === "\n  > 1 node")?.attributes,
+      output.chunks.find((chunk) => chunk.text === " opencode")?.attributes,
     ).toBe(createTextAttributes({ bold: true }))
-    expect(
-      output.chunks.find((chunk) => chunk.text === "\n    > opencode")?.attributes,
-    ).toBe(createTextAttributes({ bold: true }))
-    expect(output.chunks.map((chunk) => chunk.text).join("").match(/>/g)).toHaveLength(
-      3,
-    )
+    expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg).toBeDefined()
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node")
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server")
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window")
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("pane")
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(">")
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("active")
   })
 })
 

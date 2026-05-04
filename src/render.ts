@@ -1,4 +1,11 @@
-import { StyledText, bold, type TextChunk } from "@opentui/core"
+import {
+  StyledText,
+  bold,
+  brightBlack,
+  cyan,
+  dim,
+  type TextChunk,
+} from "@opentui/core"
 import type { TmuxSession } from "./tmux"
 
 const title = "t.watch"
@@ -16,8 +23,11 @@ export function renderNoSessions(): string {
 }
 
 export function renderSessions(sessions: TmuxSession[]): StyledText {
+  const sessionLabel = sessions.length === 1 ? "session" : "sessions"
+
   return new StyledText([
-    textChunk(`${title}\n\nSessions\n\n`),
+    bold(title),
+    muted(`  ${sessions.length} ${sessionLabel}\n\n`),
     ...sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
       ...renderSession(session),
@@ -26,31 +36,50 @@ export function renderSessions(sessions: TmuxSession[]): StyledText {
 }
 
 function renderSession(session: TmuxSession): TextChunk[] {
-  const marker = session.attached ? ">" : "*"
+  const marker = session.attached ? "●" : "○"
   const header = `${marker} ${session.name}`
   const chunks: TextChunk[] = [
-    session.attached ? bold(header) : textChunk(header),
+    session.attached ? active(header) : textChunk(header),
   ]
 
-  for (const window of session.windows) {
-    const isCurrentWindow = session.attached && window.active
-    const windowText = `${isCurrentWindow ? ">" : "*"} ${window.index} ${window.name}`
-    chunks.push(
-      isCurrentWindow ? bold(`\n  ${windowText}`) : textChunk(`\n  ${windowText}`),
-    )
-
-    for (const pane of window.panes) {
-      const isCurrentPane = isCurrentWindow && pane.active
-      const paneText = isCurrentPane
-        ? `> ${pane.processName}`
-        : pane.processName
+  session.windows.forEach((window) => {
+    window.panes.forEach((pane, paneIndex) => {
+      const branch = windowPaneBranch(window.panes.length, paneIndex)
       chunks.push(
-        isCurrentPane ? bold(`\n    ${paneText}`) : textChunk(`\n    ${paneText}`),
+        muted("\n  "),
+        muted(branch),
+        session.attached && window.active && pane.active
+          ? active(` ${pane.processName}`)
+          : textChunk(` ${pane.processName}`),
       )
-    }
-  }
+    })
+  })
 
   return chunks
+}
+
+function active(text: string): TextChunk {
+  return bold(cyan(text))
+}
+
+function muted(text: string): TextChunk {
+  return dim(brightBlack(text))
+}
+
+function windowPaneBranch(paneCount: number, paneIndex: number): string {
+  if (paneCount === 1) {
+    return "╶─"
+  }
+
+  if (paneIndex === 0) {
+    return "╭─"
+  }
+
+  if (paneIndex === paneCount - 1) {
+    return "╰─"
+  }
+
+  return "├─"
 }
 
 function textChunk(text: string): TextChunk {
