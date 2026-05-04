@@ -213,6 +213,64 @@ describe("listSessions", () => {
     })
   })
 
+  test("keeps editor panes named after the editor", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
+            "\x1f",
+          ),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "editor", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "%1", "1", "1", "nvim", "40", "node thread"].join(
+            "\x1f",
+          ),
+        },
+        {
+          exitCode: 0,
+          stdout: "400 40 lazygit lazygit",
+        },
+      ],
+    })
+
+    await expect(listSessions()).resolves.toEqual({
+      ok: true,
+      sessions: [
+        {
+          id: "$1",
+          name: "work",
+          windows: [
+            {
+              id: "@1",
+              index: 1,
+              name: "editor",
+              active: true,
+              panes: [
+                {
+                  id: "%1",
+                  index: 1,
+                  active: true,
+                  command: "nvim",
+                  title: "node thread",
+                  processName: "nvim",
+                },
+              ],
+            },
+          ],
+          attached: true,
+          createdAt: new Date(1700000000 * 1000),
+          activityAt: new Date(1700000100 * 1000),
+        },
+      ],
+    })
+  })
+
   test("returns an empty list when tmux has no sessions", async () => {
     mockTmux({ exitCode: 1, stderr: "no server running on /tmp/tmux-1000/default" })
 

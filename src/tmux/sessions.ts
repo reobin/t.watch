@@ -338,6 +338,10 @@ function resolvePaneProcessName(
     return "opencode"
   }
 
+  if (isEditorCommand(pane.command)) {
+    return prettifyProcessName(pane.command)
+  }
+
   const descendants = listDescendants(pane.pid, processTree)
   const processInfo = descendants.at(-1)
 
@@ -409,6 +413,10 @@ function isRuntimeCommand(command: string): boolean {
   return ["node", "bun", "python", "python3", "ruby", "perl", "deno"].includes(
     basename(command),
   )
+}
+
+function isEditorCommand(command: string): boolean {
+  return ["nvim", "vim"].includes(basename(command))
 }
 
 function paneKey(sessionId: string, windowId: string): string {
