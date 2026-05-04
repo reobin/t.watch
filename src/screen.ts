@@ -41,6 +41,10 @@ export function createScreen(renderer: CliRenderer, initialContent: ScreenConten
   const footer = new TextRenderable(renderer, {
     id: "shortcut-footer",
     content: new StyledText([
+      { __isChunk: true, text: "j/k", attributes: 0 },
+      dim(fg(muted)(" select  ")),
+      { __isChunk: true, text: "enter", attributes: 0 },
+      dim(fg(muted)(" focus  ")),
       { __isChunk: true, text: "ctrl+c", attributes: 0 },
       dim(fg(muted)(" exit")),
     ]),

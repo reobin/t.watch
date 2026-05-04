@@ -185,6 +185,76 @@ describe("render", () => {
     expect(inactivePaneChunk?.attributes).toBe(0);
     expect(inactivePaneChunk?.fg).toBeUndefined();
   });
+
+  test("renders the selected pane as a highlighted row", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({ id: "%1", processName: "opencode", active: true }),
+                pane({ id: "%2" }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "%2",
+      true,
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const activePaneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+    const selectedBorderChunk = output.chunks.find((chunk) => chunk.text === "\n▎ ");
+    const selectedPaneChunk = output.chunks.find((chunk) => chunk.text === " bash");
+    const selectedBranchChunk = output.chunks.find((chunk) => chunk.text === "╰─");
+
+    expect(text).toContain("  ╭─ opencode");
+    expect(text).toContain("▎ ╰─ bash");
+    expect(text).not.toContain(">");
+    expect(selectedBorderChunk?.fg?.slot).toBe(14);
+    expect(selectedBorderChunk?.bg?.slot).toBe(235);
+    expect(selectedPaneChunk?.fg).toBeUndefined();
+    expect(selectedPaneChunk?.bg?.slot).toBe(235);
+    expect(selectedBranchChunk?.fg?.slot).toBe(8);
+    expect(selectedBranchChunk?.bg?.slot).toBe(235);
+    expect(activePaneChunk?.bg).toBeUndefined();
+    expect(activePaneChunk?.attributes).toBe(0);
+  });
+
+  test("hides selected row highlighting when not actively selecting", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
+        }),
+      ],
+      "%1",
+      false,
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+
+    expect(text).toContain("  ╶─ opencode");
+    expect(text).not.toContain("▎ ╶─ opencode");
+    expect(paneChunk?.bg).toBeUndefined();
+  });
+
+  test("shows selected row highlighting on the current pane while actively selecting", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
+        }),
+      ],
+      "%1",
+      true,
+    );
+    const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+
+    expect(paneChunk?.fg).toBeUndefined();
+    expect(paneChunk?.bg?.slot).toBe(235);
+  });
 });
 
 function session(overrides: Partial<TmuxSession> = {}): TmuxSession {
