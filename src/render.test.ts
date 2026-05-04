@@ -1,27 +1,27 @@
-import { describe, expect, test } from "bun:test"
-import { createTextAttributes } from "@opentui/core"
+import { describe, expect, test } from "bun:test";
+import { createTextAttributes } from "@opentui/core";
 import {
   renderLoading,
   renderMessage,
   renderNoSessions,
   renderSessions,
-} from "./render"
-import type { TmuxSession } from "./tmux"
+} from "./render";
+import type { TmuxSession } from "./tmux";
 
 describe("render", () => {
   test("renders a message with the app title", () => {
     expect(renderMessage("Something happened.")).toBe(
       "thud.sh\n\nSomething happened.",
-    )
-  })
+    );
+  });
 
   test("renders the loading state", () => {
-    expect(renderLoading()).toBe("thud.sh\n\nLoading tmux sessions...")
-  })
+    expect(renderLoading()).toBe("thud.sh\n\nLoading tmux sessions...");
+  });
 
   test("renders the empty sessions state", () => {
-    expect(renderNoSessions()).toBe("thud.sh\n\nNo tmux sessions running.")
-  })
+    expect(renderNoSessions()).toBe("thud.sh\n\nNo tmux sessions running.");
+  });
 
   test("renders session names", () => {
     const sessions: TmuxSession[] = [
@@ -36,6 +36,7 @@ describe("render", () => {
               pane({
                 processName: "opencode",
                 active: true,
+                ssh: false,
                 integration: { tool: "opencode", status: "working" },
               }),
               pane({ processName: "bash", active: false }),
@@ -51,10 +52,14 @@ describe("render", () => {
       }),
       session({
         name: "notes",
-        windows: [window({ name: "vim", panes: [pane({ processName: "vim" })] })],
+        attached: true,
+        sshAttached: true,
+        windows: [
+          window({ name: "vim", panes: [pane({ processName: "vim" })] }),
+        ],
       }),
-    ]
-    const output = renderSessions(sessions)
+    ];
+    const output = renderSessions(sessions);
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
@@ -64,44 +69,58 @@ describe("render", () => {
         "  ╭─ opencode ● working",
         "  ╰─ bash",
         "  ╶─ bun",
-        "○ notes",
+        "● notes <ssh>",
         "  ╶─ vim",
       ].join("\n"),
-    )
+    );
     expect(
       output.chunks.find((chunk) => chunk.text === "● work")?.attributes,
-    ).toBe(createTextAttributes({ bold: true }))
+    ).toBe(createTextAttributes({ bold: true }));
     expect(
-      output.chunks.find((chunk) => chunk.text === "○ notes")?.attributes,
-    ).toBe(0)
+      output.chunks.find((chunk) => chunk.text === "● notes <ssh>")?.attributes,
+    ).toBe(createTextAttributes({ bold: true }));
+    expect(
+      output.chunks.find((chunk) => chunk.text === "● notes <ssh>")?.fg?.slot,
+    ).toBe(5);
     expect(
       output.chunks.find((chunk) => chunk.text === " opencode")?.attributes,
-    ).toBe(createTextAttributes({ bold: true }))
-    expect(output.chunks.find((chunk) => chunk.text === " opencode")?.fg?.slot).toBe(
-      6,
-    )
+    ).toBe(createTextAttributes({ bold: true }));
     expect(
-      output.chunks.find((chunk) => chunk.text === "●")?.fg,
-    ).toBeDefined()
+      output.chunks.find((chunk) => chunk.text === " opencode")?.fg?.slot,
+    ).toBe(6);
+    expect(output.chunks.find((chunk) => chunk.text === "●")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.intent).toBe(
       "indexed",
-    )
-    expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.slot).toBe(6)
+    );
+    expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.slot).toBe(6);
     expect(
       output.chunks.find((chunk) => chunk.text === " working")?.attributes,
-    ).toBe(createTextAttributes({ dim: true }))
-    expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(
-      8,
-    )
-    expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg).toBeDefined()
-    expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg?.slot).toBe(6)
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node")
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server")
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window")
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("pane")
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(">")
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("active")
-  })
+    ).toBe(createTextAttributes({ dim: true }));
+    expect(
+      output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot,
+    ).toBe(8);
+    expect(
+      output.chunks.find((chunk) => chunk.text === "● work")?.fg,
+    ).toBeDefined();
+    expect(
+      output.chunks.find((chunk) => chunk.text === "● work")?.fg?.slot,
+    ).toBe(6);
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(
+      "node",
+    );
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(
+      "server",
+    );
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(
+      "window",
+    );
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(
+      "pane",
+    );
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(
+      "active",
+    );
+  });
 
   test("renders integration status markers", () => {
     const output = renderSessions([
@@ -133,30 +152,73 @@ describe("render", () => {
           }),
         ],
       }),
-    ])
-    const text = output.chunks.map((chunk) => chunk.text).join("")
+    ]);
+    const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("● idle")
-    expect(text).toContain("● working")
-    expect(text).toContain("● requesting")
-    expect(text).toContain("● error")
-    expect(text).toContain("● unknown")
-    const markers = output.chunks.filter((chunk) => chunk.text === "●")
+    expect(text).toContain("● idle");
+    expect(text).toContain("● working");
+    expect(text).toContain("● requesting");
+    expect(text).toContain("● error");
+    expect(text).toContain("● unknown");
+    const markers = output.chunks.filter((chunk) => chunk.text === "●");
 
-    expect(markers).toHaveLength(5)
+    expect(markers).toHaveLength(5);
     expect(markers.map((chunk) => chunk.fg?.intent)).toEqual([
       "indexed",
       "indexed",
       "indexed",
       "indexed",
       "indexed",
-    ])
-    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([2, 6, 5, 1, 8])
+    ]);
+    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([2, 6, 5, 1, 8]);
     for (const chunk of markers) {
-      expect(chunk.fg).toBeDefined()
+      expect(chunk.fg).toBeDefined();
     }
-  })
-})
+  });
+
+  test("renders ssh panes in the ssh color", () => {
+    const output = renderSessions([
+      session({
+        attached: true,
+        windows: [
+          window({
+            panes: [pane({ processName: "ssh", active: true, ssh: true })],
+          }),
+        ],
+      }),
+    ]);
+    const sshPane = output.chunks.find((chunk) => chunk.text === " ssh");
+
+    expect(sshPane?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(sshPane?.fg?.slot).toBe(5);
+  });
+
+  test("renders focused panes under ssh-attached sessions in the ssh color", () => {
+    const output = renderSessions([
+      session({
+        attached: true,
+        sshAttached: true,
+        windows: [
+          window({
+            panes: [
+              pane({ processName: "bash", active: true, ssh: false }),
+              pane({ processName: "zsh", active: false, ssh: false }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const paneChunk = output.chunks.find((chunk) => chunk.text === " bash");
+    const inactivePaneChunk = output.chunks.find(
+      (chunk) => chunk.text === " zsh",
+    );
+
+    expect(paneChunk?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(paneChunk?.fg?.slot).toBe(5);
+    expect(inactivePaneChunk?.attributes).toBe(0);
+    expect(inactivePaneChunk?.fg).toBeUndefined();
+  });
+});
 
 function session(overrides: Partial<TmuxSession> = {}): TmuxSession {
   return {
@@ -164,10 +226,11 @@ function session(overrides: Partial<TmuxSession> = {}): TmuxSession {
     name: "default",
     windows: [],
     attached: false,
+    sshAttached: false,
     createdAt: new Date(0),
     activityAt: new Date(0),
     ...overrides,
-  }
+  };
 }
 
 function window(overrides: Partial<TmuxSession["windows"][number]> = {}) {
@@ -178,7 +241,7 @@ function window(overrides: Partial<TmuxSession["windows"][number]> = {}) {
     active: true,
     panes: [],
     ...overrides,
-  }
+  };
 }
 
 function pane(
@@ -191,6 +254,7 @@ function pane(
     command: "bash",
     title: "bash",
     processName: "bash",
+    ssh: false,
     ...overrides,
-  }
+  };
 }
