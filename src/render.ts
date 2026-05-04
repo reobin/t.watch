@@ -1,21 +1,21 @@
 import {
+  RGBA,
   StyledText,
-  bgBlack,
-  bgCyan,
-  bgGreen,
-  bgMagenta,
-  bgRed,
-  black,
   bold,
-  brightBlack,
-  cyan,
   dim,
-  white,
+  fg,
   type TextChunk,
 } from "@opentui/core"
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux"
 
 const title = "t.watch"
+const palette = {
+  red: 1,
+  green: 2,
+  magenta: 5,
+  cyan: 6,
+  gray: 8,
+} as const
 
 export function renderLoading(): string {
   return renderMessage("Loading tmux sessions...")
@@ -77,47 +77,49 @@ function renderStatusPill(pane: TmuxPane): TextChunk[] {
 
   const label = integration.label ?? statusLabel(integration.status)
 
-  return [textChunk(" "), statusColor(integration.status)(`[${label}]`)]
+  return [textChunk(" "), statusCircle(integration.status), muted(` ${label}`)]
 }
 
-function statusColor(
-  status: TmuxPaneIntegrationStatus,
-): (text: string) => TextChunk {
+function statusCircle(status: TmuxPaneIntegrationStatus): TextChunk {
   switch (status) {
     case "idle":
-      return (text) => bold(bgGreen(black(text)))
+      return bold(terminalFg(palette.green, "●"))
     case "working":
-      return (text) => bold(bgCyan(black(text)))
+      return bold(terminalFg(palette.cyan, "●"))
     case "requesting":
-      return (text) => bold(bgMagenta(white(text)))
+      return bold(terminalFg(palette.magenta, "●"))
     case "error":
-      return (text) => bold(bgRed(white(text)))
+      return bold(terminalFg(palette.red, "●"))
     case "unknown":
-      return (text) => dim(bgBlack(white(text)))
+      return dim(terminalFg(palette.gray, "●"))
   }
 }
 
 function statusLabel(status: TmuxPaneIntegrationStatus): string {
   switch (status) {
     case "idle":
-      return "Idle"
+      return "idle"
     case "working":
-      return "Working"
+      return "working"
     case "requesting":
-      return "Requesting"
+      return "requesting"
     case "error":
-      return "Error"
+      return "error"
     case "unknown":
-      return "Unknown"
+      return "unknown"
   }
 }
 
 function active(text: string): TextChunk {
-  return bold(cyan(text))
+  return bold(terminalFg(palette.cyan, text))
 }
 
 function muted(text: string): TextChunk {
-  return dim(brightBlack(text))
+  return dim(terminalFg(palette.gray, text))
+}
+
+function terminalFg(index: number, text: string): TextChunk {
+  return fg(RGBA.fromIndex(index))(text)
 }
 
 function windowPaneBranch(paneCount: number, paneIndex: number): string {

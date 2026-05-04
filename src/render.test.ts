@@ -61,7 +61,7 @@ describe("render", () => {
         "t.watch",
         "",
         "● work",
-        "  ╭─ opencode [Working]",
+        "  ╭─ opencode ● working",
         "  ╰─ bash",
         "  ╶─ bun",
         "○ notes",
@@ -77,10 +77,24 @@ describe("render", () => {
     expect(
       output.chunks.find((chunk) => chunk.text === " opencode")?.attributes,
     ).toBe(createTextAttributes({ bold: true }))
+    expect(output.chunks.find((chunk) => chunk.text === " opencode")?.fg?.slot).toBe(
+      6,
+    )
     expect(
-      output.chunks.find((chunk) => chunk.text === "[Working]")?.bg,
+      output.chunks.find((chunk) => chunk.text === "●")?.fg,
     ).toBeDefined()
+    expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.intent).toBe(
+      "indexed",
+    )
+    expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.slot).toBe(6)
+    expect(
+      output.chunks.find((chunk) => chunk.text === " working")?.attributes,
+    ).toBe(createTextAttributes({ dim: true }))
+    expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(
+      8,
+    )
     expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg).toBeDefined()
+    expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg?.slot).toBe(6)
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node")
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server")
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window")
@@ -89,7 +103,7 @@ describe("render", () => {
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("active")
   })
 
-  test("renders integration status pills", () => {
+  test("renders integration status markers", () => {
     const output = renderSessions([
       session({
         windows: [
@@ -122,18 +136,25 @@ describe("render", () => {
     ])
     const text = output.chunks.map((chunk) => chunk.text).join("")
 
-    expect(text).toContain("[Idle]")
-    expect(text).toContain("[Working]")
-    expect(text).toContain("[Requesting]")
-    expect(text).toContain("[Error]")
-    expect(text).toContain("[Unknown]")
-    expect(output.chunks.find((chunk) => chunk.text === "[Idle]")?.bg).toBeDefined()
-    expect(output.chunks.find((chunk) => chunk.text === "[Working]")?.bg).toBeDefined()
-    expect(
-      output.chunks.find((chunk) => chunk.text === "[Requesting]")?.bg,
-    ).toBeDefined()
-    expect(output.chunks.find((chunk) => chunk.text === "[Error]")?.bg).toBeDefined()
-    expect(output.chunks.find((chunk) => chunk.text === "[Unknown]")?.bg).toBeDefined()
+    expect(text).toContain("● idle")
+    expect(text).toContain("● working")
+    expect(text).toContain("● requesting")
+    expect(text).toContain("● error")
+    expect(text).toContain("● unknown")
+    const markers = output.chunks.filter((chunk) => chunk.text === "●")
+
+    expect(markers).toHaveLength(5)
+    expect(markers.map((chunk) => chunk.fg?.intent)).toEqual([
+      "indexed",
+      "indexed",
+      "indexed",
+      "indexed",
+      "indexed",
+    ])
+    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([2, 6, 5, 1, 8])
+    for (const chunk of markers) {
+      expect(chunk.fg).toBeDefined()
+    }
   })
 })
 
