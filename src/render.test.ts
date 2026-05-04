@@ -88,6 +88,53 @@ describe("render", () => {
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain(">")
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("active")
   })
+
+  test("renders integration status pills", () => {
+    const output = renderSessions([
+      session({
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "working" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "requesting" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "error" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "unknown" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ])
+    const text = output.chunks.map((chunk) => chunk.text).join("")
+
+    expect(text).toContain("[Idle]")
+    expect(text).toContain("[Working]")
+    expect(text).toContain("[Requesting]")
+    expect(text).toContain("[Error]")
+    expect(text).toContain("[Unknown]")
+    expect(output.chunks.find((chunk) => chunk.text === "[Idle]")?.bg).toBeDefined()
+    expect(output.chunks.find((chunk) => chunk.text === "[Working]")?.bg).toBeDefined()
+    expect(
+      output.chunks.find((chunk) => chunk.text === "[Requesting]")?.bg,
+    ).toBeDefined()
+    expect(output.chunks.find((chunk) => chunk.text === "[Error]")?.bg).toBeDefined()
+    expect(output.chunks.find((chunk) => chunk.text === "[Unknown]")?.bg).toBeDefined()
+  })
 })
 
 function session(overrides: Partial<TmuxSession> = {}): TmuxSession {

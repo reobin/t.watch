@@ -47,7 +47,7 @@ export const TWatchStatus = async ({ $ }: OpenCodePluginContext) => {
         }
 
         if (status === "retry") {
-          await setStatus("waiting", "Retrying")
+          await setStatus("working")
           return
         }
 
@@ -67,6 +67,16 @@ export const TWatchStatus = async ({ $ }: OpenCodePluginContext) => {
 
       if (event.type === "session.error") {
         await setStatus("error")
+        return
+      }
+
+      if (event.type === "permission.asked") {
+        await setStatus("requesting")
+        return
+      }
+
+      if (event.type === "permission.replied") {
+        await setStatus("working")
       }
     },
   }

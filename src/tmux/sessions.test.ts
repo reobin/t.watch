@@ -37,8 +37,8 @@ describe("listSessions", () => {
               "10",
               "OC | Coding",
               "opencode",
-              "working",
-              "Coding",
+              "requesting",
+              "",
               "1700000110",
             ].join("\x1f"),
             [
@@ -92,8 +92,7 @@ describe("listSessions", () => {
                   processName: "opencode",
                   integration: {
                     tool: "opencode",
-                    status: "working",
-                    label: "Coding",
+                    status: "requesting",
                     updatedAt: new Date(1700000110 * 1000),
                   },
                 },

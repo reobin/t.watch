@@ -38,7 +38,7 @@ export type TmuxPane = {
 export type TmuxPaneIntegrationStatus =
   | "idle"
   | "working"
-  | "waiting"
+  | "requesting"
   | "error"
   | "unknown"
 

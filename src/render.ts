@@ -3,8 +3,8 @@ import {
   bgBlack,
   bgCyan,
   bgGreen,
+  bgMagenta,
   bgRed,
-  bgYellow,
   black,
   bold,
   brightBlack,
@@ -88,8 +88,8 @@ function statusColor(
       return (text) => bold(bgGreen(black(text)))
     case "working":
       return (text) => bold(bgCyan(black(text)))
-    case "waiting":
-      return (text) => bold(bgYellow(black(text)))
+    case "requesting":
+      return (text) => bold(bgMagenta(white(text)))
     case "error":
       return (text) => bold(bgRed(white(text)))
     case "unknown":
@@ -103,8 +103,8 @@ function statusLabel(status: TmuxPaneIntegrationStatus): string {
       return "Idle"
     case "working":
       return "Working"
-    case "waiting":
-      return "Waiting"
+    case "requesting":
+      return "Requesting"
     case "error":
       return "Error"
     case "unknown":
