@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { TWatchStatus } from "./t-watch-status"
+import { ThudShStatus } from "./thud-sh-status"
 
-describe("TWatchStatus", () => {
+describe("ThudShStatus", () => {
   afterEach(() => {
     delete process.env.TMUX_PANE
   })
@@ -9,7 +9,7 @@ describe("TWatchStatus", () => {
   test("marks OpenCode questions as requesting", async () => {
     process.env.TMUX_PANE = "%1"
     const shell = mockShell()
-    const plugin = await TWatchStatus({ $: shell.$ as typeof Bun.$ })
+    const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ })
 
     await plugin.event({ event: { type: "question.asked" } })
 
@@ -19,7 +19,7 @@ describe("TWatchStatus", () => {
   test("marks answered or dismissed OpenCode questions as working", async () => {
     process.env.TMUX_PANE = "%1"
     const shell = mockShell()
-    const plugin = await TWatchStatus({ $: shell.$ as typeof Bun.$ })
+    const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ })
 
     await plugin.event({ event: { type: "question.asked" } })
     await plugin.event({ event: { type: "question.replied" } })
@@ -57,7 +57,7 @@ function mockShell(): { calls: string[]; $: unknown } {
 
 function statuses(calls: string[]): string[] {
   return calls.flatMap((call) => {
-    const match = call.match(/@t_watch_status\s+(\S+)/)
+    const match = call.match(/@thud_sh_status\s+(\S+)/)
 
     return match?.[1] ? [match[1]] : []
   })

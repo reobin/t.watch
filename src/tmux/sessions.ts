@@ -32,10 +32,10 @@ const paneFormat = [
   "#{pane_current_command}",
   "#{pane_pid}",
   "#{pane_title}",
-  "#{@t_watch_tool}",
-  "#{@t_watch_status}",
-  "#{@t_watch_status_label}",
-  "#{@t_watch_status_updated_at}",
+  "#{@thud_sh_tool}",
+  "#{@thud_sh_status}",
+  "#{@thud_sh_status_label}",
+  "#{@thud_sh_status_updated_at}",
 ].join(fieldSeparator)
 
 type PaneRecord = TmuxPane & {

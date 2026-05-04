@@ -8,7 +8,7 @@ import {
 } from "@opentui/core"
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux"
 
-const title = "t.watch"
+const title = "thud.sh"
 const palette = {
   red: 1,
   green: 2,

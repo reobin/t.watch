@@ -23,7 +23,7 @@ export async function watchSessions(
   onStop?: (message: string) => void,
 ): Promise<TmuxSessionWatchResult> {
   const hookIndex = String(process.pid)
-  const channel = `t.watch-sessions-${process.pid}`
+  const channel = `thud-sh-sessions-${process.pid}`
   const installedHooks: string[] = []
   let waitProcess: ReturnType<typeof Bun.spawn> | undefined
   let stopped = false

@@ -1,6 +1,6 @@
-# t.watch
+# thud.sh
 
-A tiny tmux session watcher for the terminal.
+A tiny terminal HUD for watching tmux sessions, panes, and agent status.
 
 It shows running tmux sessions, windows, panes, and optional pane status from integrations such as OpenCode.
 
@@ -9,8 +9,8 @@ It shows running tmux sessions, windows, panes, and optional pane status from in
 Install globally from npm:
 
 ```sh
-npm install -g @reobin/t.watch
-t.watch
+npm install -g thud.sh
+thud.sh
 ```
 
 Or run from source:
@@ -42,4 +42,4 @@ npm publish
 
 ## OpenCode Integration
 
-Load `integrations/opencode/t-watch-status.ts` as an OpenCode plugin to publish pane status into tmux options for `t.watch`.
+Load `integrations/opencode/thud-sh-status.ts` as an OpenCode plugin to publish pane status into tmux options for `thud.sh`.

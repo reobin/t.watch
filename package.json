@@ -1,9 +1,10 @@
 {
-  "name": "@reobin/t.watch",
+  "name": "thud.sh",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "t.watch": "dist/index.js"
+    "thud.sh": "dist/index.js",
+    "thud": "dist/index.js"
   },
   "files": [
     "dist",

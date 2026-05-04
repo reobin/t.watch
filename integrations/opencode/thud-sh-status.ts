@@ -13,7 +13,7 @@ type OpenCodePluginContext = {
 
 const tool = "opencode"
 
-export const TWatchStatus = async ({ $ }: OpenCodePluginContext) => {
+export const ThudShStatus = async ({ $ }: OpenCodePluginContext) => {
   const pane = process.env.TMUX_PANE
 
   async function setStatus(status: string, label?: string): Promise<void> {
@@ -23,14 +23,14 @@ export const TWatchStatus = async ({ $ }: OpenCodePluginContext) => {
 
     const updatedAt = Math.floor(Date.now() / 1000).toString()
 
-    await $`tmux set-option -p -t ${pane} @t_watch_tool ${tool}`.quiet()
-    await $`tmux set-option -p -t ${pane} @t_watch_status ${status}`.quiet()
-    await $`tmux set-option -p -t ${pane} @t_watch_status_updated_at ${updatedAt}`.quiet()
+    await $`tmux set-option -p -t ${pane} @thud_sh_tool ${tool}`.quiet()
+    await $`tmux set-option -p -t ${pane} @thud_sh_status ${status}`.quiet()
+    await $`tmux set-option -p -t ${pane} @thud_sh_status_updated_at ${updatedAt}`.quiet()
 
     if (label) {
-      await $`tmux set-option -p -t ${pane} @t_watch_status_label ${label}`.quiet()
+      await $`tmux set-option -p -t ${pane} @thud_sh_status_label ${label}`.quiet()
     } else {
-      await $`tmux set-option -pu -t ${pane} @t_watch_status_label`.quiet()
+      await $`tmux set-option -pu -t ${pane} @thud_sh_status_label`.quiet()
     }
   }
 

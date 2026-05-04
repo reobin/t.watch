@@ -166,7 +166,7 @@ describe("listSessions", () => {
         "list-panes",
         "-a",
         "-F",
-        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@t_watch_tool}\x1f#{@t_watch_status}\x1f#{@t_watch_status_label}\x1f#{@t_watch_status_updated_at}",
+        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@thud_sh_tool}\x1f#{@thud_sh_status}\x1f#{@thud_sh_status_label}\x1f#{@thud_sh_status_updated_at}",
       ],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
     ])

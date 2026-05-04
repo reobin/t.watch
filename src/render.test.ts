@@ -11,16 +11,16 @@ import type { TmuxSession } from "./tmux"
 describe("render", () => {
   test("renders a message with the app title", () => {
     expect(renderMessage("Something happened.")).toBe(
-      "t.watch\n\nSomething happened.",
+      "thud.sh\n\nSomething happened.",
     )
   })
 
   test("renders the loading state", () => {
-    expect(renderLoading()).toBe("t.watch\n\nLoading tmux sessions...")
+    expect(renderLoading()).toBe("thud.sh\n\nLoading tmux sessions...")
   })
 
   test("renders the empty sessions state", () => {
-    expect(renderNoSessions()).toBe("t.watch\n\nNo tmux sessions running.")
+    expect(renderNoSessions()).toBe("thud.sh\n\nNo tmux sessions running.")
   })
 
   test("renders session names", () => {
@@ -58,7 +58,7 @@ describe("render", () => {
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
-        "t.watch",
+        "thud.sh",
         "",
         "● work",
         "  ╭─ opencode ● working",

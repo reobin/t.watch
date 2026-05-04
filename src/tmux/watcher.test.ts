@@ -153,7 +153,7 @@ function hookTarget(hook: string): string {
 }
 
 function channel(): string {
-  return `t.watch-sessions-${process.pid}`
+  return `thud-sh-sessions-${process.pid}`
 }
 
 function processResult(options: {
