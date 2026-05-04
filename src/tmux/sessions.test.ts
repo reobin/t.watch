@@ -213,6 +213,64 @@ describe("listSessions", () => {
     })
   })
 
+  test("uses unknown for invalid integration statuses", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join(
+            "\x1f",
+          ),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            "$1",
+            "@1",
+            "%1",
+            "1",
+            "1",
+            "node",
+            "10",
+            "OC | Coding",
+            "opencode",
+            "",
+            "",
+            "1700000110",
+          ].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: "100 10 node node /home/reobin/.local/bin/opencode",
+        },
+      ],
+    })
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  integration: {
+                    tool: "opencode",
+                    status: "unknown",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  })
+
   test("keeps editor panes named after the editor", async () => {
     mockTmux({
       results: [
