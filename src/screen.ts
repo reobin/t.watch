@@ -3,10 +3,10 @@ import {
   RGBA,
   StyledText,
   TextRenderable,
-  dim,
   fg,
   type CliRenderer,
 } from "@opentui/core";
+import type { RenderTheme } from "./render";
 
 type ScreenContent = string | StyledText;
 
@@ -18,8 +18,13 @@ export type Screen = {
   setContent: (content: ScreenContent) => void;
 };
 
-export function createScreen(renderer: CliRenderer, initialContent: ScreenContent): Screen {
+export function createScreen(
+  renderer: CliRenderer,
+  initialContent: ScreenContent,
+  theme: RenderTheme = {},
+): Screen {
   renderer.setBackgroundColor(terminalBg);
+  const textMutedFg = theme.textMutedFg ?? muted;
 
   const layout = new BoxRenderable(renderer, {
     id: "screen-layout",
@@ -41,12 +46,12 @@ export function createScreen(renderer: CliRenderer, initialContent: ScreenConten
   const footer = new TextRenderable(renderer, {
     id: "shortcut-footer",
     content: new StyledText([
-      { __isChunk: true, text: "j/k", attributes: 0 },
-      dim(fg(muted)(" select  ")),
-      { __isChunk: true, text: "↵", attributes: 0 },
-      dim(fg(muted)(" focus  ")),
-      { __isChunk: true, text: "^C", attributes: 0 },
-      dim(fg(muted)(" exit")),
+      fg(terminalFg)("j/k"),
+      fg(textMutedFg)(" select  "),
+      fg(terminalFg)("↵"),
+      fg(textMutedFg)(" focus  "),
+      fg(terminalFg)("^C"),
+      fg(textMutedFg)(" exit"),
     ]),
     width: "100%",
     height: 1,

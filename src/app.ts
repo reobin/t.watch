@@ -51,9 +51,9 @@ export async function startApp(): Promise<void> {
     },
   });
 
-  const screen = createScreen(renderer, renderLoading());
   process.stdout.write(enableTerminalFocusReporting);
   const renderTheme = await detectRenderTheme(renderer, paletteTimeoutMs);
+  const screen = createScreen(renderer, renderLoading(), renderTheme);
   terminalWidth = renderer.width;
 
   renderer.on("resize", (width) => {
