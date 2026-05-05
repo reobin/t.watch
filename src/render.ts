@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { RGBA, StyledText, bold, dim, fg, type TextChunk } from "@opentui/core";
+import { RGBA, StyledText, bold, fg, type TextChunk } from "@opentui/core";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const palette = {
@@ -14,6 +14,7 @@ const palette = {
 
 export type RenderTheme = {
   selectedBg?: RGBA;
+  textMutedFg?: RGBA;
   width?: number;
 };
 
@@ -35,11 +36,12 @@ export function renderSessions(
   theme: RenderTheme = {},
 ): StyledText {
   const selectedBg = theme.selectedBg ?? RGBA.fromIndex(palette.selectedBg);
+  const textMutedFg = theme.textMutedFg ?? RGBA.fromIndex(palette.gray);
 
   return new StyledText(
     sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
-      ...renderSession(session, selectedSessionId, selectedBg, theme.width),
+      ...renderSession(session, selectedSessionId, selectedBg, textMutedFg, theme.width),
     ]),
   );
 }
@@ -48,12 +50,13 @@ function renderSession(
   session: TmuxSession,
   selectedSessionId: string | undefined,
   selectedBg: RGBA,
+  textMutedFg: RGBA,
   width: number | undefined,
 ): TextChunk[] {
   const header = `${session.name}${session.sshAttached ? " <ssh>" : ""}`;
   const chunks: TextChunk[] = [
     renderSessionHeader(header, session),
-    ...renderSessionMetadata(session),
+    ...renderSessionMetadata(session, textMutedFg),
   ];
   const isSelectedSession = session.id === selectedSessionId;
 
@@ -61,12 +64,13 @@ function renderSession(
     window.panes.forEach((pane, paneIndex) => {
       const branch = windowPaneBranch(window.panes.length, paneIndex);
       const rowChunks = [
-        muted("\n"),
-        muted(branch),
+        muted("\n", textMutedFg),
+        muted(branch, textMutedFg),
         ...renderPaneName(
           pane,
           session.attached && window.active && pane.active,
           session.sshAttached,
+          textMutedFg,
         ),
       ];
 
@@ -77,12 +81,12 @@ function renderSession(
   return sessionBlock(chunks, isSelectedSession, selectedBg, width);
 }
 
-function renderSessionMetadata(session: TmuxSession): TextChunk[] {
+function renderSessionMetadata(session: TmuxSession, textMutedFg: RGBA): TextChunk[] {
   const lines = [session.path ? formatPath(session.path) : undefined, formatBranch(session)].filter(
     (line): line is string => Boolean(line),
   );
 
-  return lines.map((line) => muted(`\n· ${line}`));
+  return lines.map((line) => muted(`\n· ${line}`, textMutedFg));
 }
 
 function formatPath(path: string): string {
@@ -114,9 +118,13 @@ function renderSessionHeader(header: string, session: TmuxSession): TextChunk {
 function renderPaneName(
   pane: TmuxPane,
   isActive: boolean,
-  isSshAttachedSession = false,
+  isSshAttachedSession: boolean,
+  textMutedFg: RGBA,
 ): TextChunk[] {
-  return [renderPaneProcessName(pane, isActive, isSshAttachedSession), ...renderStatusPill(pane)];
+  return [
+    renderPaneProcessName(pane, isActive, isSshAttachedSession),
+    ...renderStatusPill(pane, textMutedFg),
+  ];
 }
 
 function renderPaneProcessName(
@@ -133,7 +141,7 @@ function renderPaneProcessName(
   return isActive ? active(name) : textChunk(name);
 }
 
-function renderStatusPill(pane: TmuxPane): TextChunk[] {
+function renderStatusPill(pane: TmuxPane, textMutedFg: RGBA): TextChunk[] {
   const integration = pane.integration;
 
   if (!integration) {
@@ -142,10 +150,14 @@ function renderStatusPill(pane: TmuxPane): TextChunk[] {
 
   const label = integration.label ?? statusLabel(integration.status);
 
-  return [textChunk(" "), statusCircle(integration.status), muted(` ${label}`)];
+  return [
+    textChunk(" "),
+    statusCircle(integration.status, textMutedFg),
+    muted(` ${label}`, textMutedFg),
+  ];
 }
 
-function statusCircle(status: TmuxPaneIntegrationStatus): TextChunk {
+function statusCircle(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA): TextChunk {
   switch (status) {
     case "idle":
       return bold(terminalFg(palette.green, "●"));
@@ -156,7 +168,7 @@ function statusCircle(status: TmuxPaneIntegrationStatus): TextChunk {
     case "error":
       return bold(terminalFg(palette.red, "●"));
     case "unknown":
-      return dim(terminalFg(palette.gray, "●"));
+      return fg(textMutedFg)("●");
   }
 }
 
@@ -247,8 +259,8 @@ function sessionBorder(isSelected: boolean, selectedBg: RGBA): TextChunk {
   return isSelected ? selected(chunk, selectedBg) : chunk;
 }
 
-function muted(text: string): TextChunk {
-  return dim(terminalFg(palette.gray, text));
+function muted(text: string, textMutedFg: RGBA): TextChunk {
+  return fg(textMutedFg)(text);
 }
 
 function terminalFg(index: number, text: string): TextChunk {
