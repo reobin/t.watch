@@ -72,6 +72,12 @@ export async function startApp(): Promise<void> {
       return;
     }
 
+    if (key.name === "q") {
+      key.preventDefault();
+      renderer.destroy();
+      return;
+    }
+
     if (key.name === "j" || key.name === "down") {
       key.preventDefault();
       selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
