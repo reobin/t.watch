@@ -15,12 +15,15 @@ import {
   firstPaneId,
   firstSessionId,
   hasSession,
+  isAttachedActivePane,
   selectNextSession,
   selectPreviousSession,
 } from "./navigation";
 
 const refreshIntervalMs = 1500;
 const paletteTimeoutMs = 100;
+const enableTerminalFocusReporting = "\x1b[?1004h";
+const disableTerminalFocusReporting = "\x1b[?1004l";
 
 export async function startApp(): Promise<void> {
   let isDestroyed = false;
@@ -32,11 +35,13 @@ export async function startApp(): Promise<void> {
   let currentSessionId: string | undefined;
   let sessions: TmuxSession[] = [];
   let terminalWidth = 0;
+  const appPaneId = process.env.TMUX_PANE;
 
   const renderer = await createCliRenderer({
     exitOnCtrlC: true,
     onDestroy: () => {
       isDestroyed = true;
+      process.stdout.write(disableTerminalFocusReporting);
 
       if (refreshTimer) {
         clearInterval(refreshTimer);
@@ -47,6 +52,7 @@ export async function startApp(): Promise<void> {
   });
 
   const screen = createScreen(renderer, renderLoading());
+  process.stdout.write(enableTerminalFocusReporting);
   const renderTheme = await detectRenderTheme(renderer, paletteTimeoutMs);
   terminalWidth = renderer.width;
 
@@ -55,6 +61,10 @@ export async function startApp(): Promise<void> {
     if (sessions.length > 0) {
       renderCurrentSessions();
     }
+  });
+
+  renderer.on("blur", () => {
+    resetSelectedSessionToCurrent();
   });
 
   renderer.keyInput.on("keypress", (key) => {
@@ -98,10 +108,14 @@ export async function startApp(): Promise<void> {
 
     isStartingWatcher = true;
     try {
-      const result = await watchSessions(refreshSessions, () => {
-        sessionWatcher = undefined;
-        startRefreshPolling();
-      });
+      const result = await watchSessions(
+        refreshSessions,
+        () => {
+          sessionWatcher = undefined;
+          startRefreshPolling();
+        },
+        resetSelectedSessionToCurrent,
+      );
 
       if (isDestroyed) {
         if (result.ok === true) {
@@ -148,10 +162,13 @@ export async function startApp(): Promise<void> {
     sessions = result.sessions;
     const nextCurrentSessionId =
       findCurrentSessionId(sessions, undefined) ?? firstSessionId(sessions);
+    const appPaneLostTmuxFocus = Boolean(appPaneId) && !isAttachedActivePane(sessions, appPaneId);
+
     if (
       currentSessionId !== nextCurrentSessionId ||
       !hasSession(sessions, selectedSessionId) ||
-      selectedSessionId === undefined
+      selectedSessionId === undefined ||
+      appPaneLostTmuxFocus
     ) {
       selectedSessionId = nextCurrentSessionId;
     }
@@ -177,6 +194,20 @@ export async function startApp(): Promise<void> {
         width: terminalWidth,
       }),
     );
+  }
+
+  function resetSelectedSessionToCurrent(): void {
+    const nextSelectedSessionId =
+      findCurrentSessionId(sessions, currentSessionId) ??
+      findCurrentSessionId(sessions, undefined) ??
+      firstSessionId(sessions);
+
+    if (selectedSessionId === nextSelectedSessionId) {
+      return;
+    }
+
+    selectedSessionId = nextSelectedSessionId;
+    renderCurrentSessions();
   }
 
   async function focusSelectedSession(): Promise<void> {

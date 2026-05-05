@@ -21,12 +21,17 @@ const sessionChangeHooks = [
 export async function watchSessions(
   onChange: () => void | Promise<void>,
   onStop?: (message: string) => void,
+  onClientFocusOut?: () => void | Promise<void>,
 ): Promise<TmuxSessionWatchResult> {
   const hookIndex = String(process.pid);
   const channel = `thud-sh-sessions-${process.pid}`;
+  const clientFocusOutChannel = `thud-sh-client-focus-out-${process.pid}`;
   const installedHooks: string[] = [];
   let waitProcess: ReturnType<typeof Bun.spawn> | undefined;
+  let clientFocusOutWaitProcess: ReturnType<typeof Bun.spawn> | undefined;
   let stopped = false;
+  let cleanedUp = false;
+  let watchClientFocusOut = false;
   let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
@@ -44,6 +49,41 @@ export async function watchSessions(
       }
 
       installedHooks.push(hookTarget);
+    }
+
+    if (onClientFocusOut && (await isFocusEventsEnabled())) {
+      const clientName = await currentClientName();
+
+      if (!clientName) {
+        await unsetHooks(installedHooks);
+
+        return {
+          ok: false,
+          message: "tmux client focus watcher failed.",
+        };
+      }
+
+      const hookTarget = `client-focus-out[${hookIndex}]`;
+      const result = await runTmux([
+        "set-hook",
+        "-g",
+        hookTarget,
+        `if -F ${quoteTmuxString(`#{==:#{hook_client},${clientName}}`)} ${quoteTmuxString(
+          `wait-for -S ${clientFocusOutChannel}`,
+        )}`,
+      ]);
+
+      if (result.exitCode !== 0) {
+        await unsetHooks(installedHooks);
+
+        return {
+          ok: false,
+          message: result.stderr.trim() || "tmux session watcher failed.",
+        };
+      }
+
+      installedHooks.push(hookTarget);
+      watchClientFocusOut = true;
     }
   } catch (error) {
     await unsetHooks(installedHooks);
@@ -66,6 +106,29 @@ export async function watchSessions(
     }, 75);
   };
 
+  const cleanup = async () => {
+    if (cleanedUp) {
+      return;
+    }
+
+    cleanedUp = true;
+
+    if (refreshTimeout) {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = undefined;
+    }
+
+    waitProcess?.kill();
+    clientFocusOutWaitProcess?.kill();
+    await unsetHooks(installedHooks);
+  };
+
+  const stopFromError = async (message: string) => {
+    stopped = true;
+    await cleanup();
+    onStop?.(message);
+  };
+
   const waitForChanges = async () => {
     while (!stopped) {
       const tmuxProcess = Bun.spawn(["tmux", "wait-for", channel], {
@@ -84,9 +147,7 @@ export async function watchSessions(
       }
 
       if (exitCode !== 0) {
-        stopped = true;
-        await unsetHooks(installedHooks);
-        onStop?.(stderr.trim() || "tmux session watcher stopped.");
+        await stopFromError(stderr.trim() || "tmux session watcher stopped.");
         break;
       }
 
@@ -94,21 +155,43 @@ export async function watchSessions(
     }
   };
 
+  const waitForClientFocusOut = async () => {
+    while (!stopped) {
+      const tmuxProcess = Bun.spawn(["tmux", "wait-for", clientFocusOutChannel], {
+        stderr: "pipe",
+        stdout: "pipe",
+      });
+      clientFocusOutWaitProcess = tmuxProcess;
+
+      const [exitCode, stderr] = await Promise.all([
+        tmuxProcess.exited,
+        new Response(tmuxProcess.stderr).text(),
+      ]);
+
+      if (stopped) {
+        break;
+      }
+
+      if (exitCode !== 0) {
+        await stopFromError(stderr.trim() || "tmux client focus watcher stopped.");
+        break;
+      }
+
+      void onClientFocusOut?.();
+    }
+  };
+
   void waitForChanges();
+  if (watchClientFocusOut) {
+    void waitForClientFocusOut();
+  }
 
   return {
     ok: true,
     watcher: {
       stop: async () => {
         stopped = true;
-
-        if (refreshTimeout) {
-          clearTimeout(refreshTimeout);
-          refreshTimeout = undefined;
-        }
-
-        waitProcess?.kill();
-        await unsetHooks(installedHooks);
+        await cleanup();
       },
     },
   };
@@ -116,4 +199,24 @@ export async function watchSessions(
 
 async function unsetHooks(hooks: string[]): Promise<void> {
   await Promise.all(hooks.map((hook) => runTmux(["set-hook", "-gu", hook]).catch(() => undefined)));
+}
+
+async function isFocusEventsEnabled(): Promise<boolean> {
+  const result = await runTmux(["show-options", "-gqv", "focus-events"]);
+
+  return result.exitCode === 0 && result.stdout.trim() === "on";
+}
+
+async function currentClientName(): Promise<string | undefined> {
+  const result = await runTmux(["display-message", "-p", "#{client_name}"]);
+
+  if (result.exitCode !== 0) {
+    return undefined;
+  }
+
+  return result.stdout.trim() || undefined;
+}
+
+function quoteTmuxString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }

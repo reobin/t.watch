@@ -52,6 +52,126 @@ describe("watchSessions", () => {
     expect(calls).toEqual([...installHookCalls(), waitForCall(), ...unsetHookCalls()]);
   });
 
+  test("installs a client focus-out hook when requested", async () => {
+    const wait = deferred<number>();
+    const focusOutWait = deferred<number>();
+    const calls: string[][] = [];
+    const kill = mock();
+    const onClientFocusOut = mock();
+    let focusOutWaitCount = 0;
+
+    spyOn(Bun, "spawn").mockImplementation((command) => {
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
+
+      if (args[1] === "show-options") {
+        return processResult({ exited: Promise.resolve(0), stdout: "on\n" });
+      }
+
+      if (args[1] === "display-message") {
+        return processResult({ exited: Promise.resolve(0), stdout: "/dev/pts/0\n" });
+      }
+
+      if (args[1] === "wait-for" && args[2] === focusOutChannel()) {
+        focusOutWaitCount += 1;
+
+        return processResult({
+          exited: focusOutWaitCount === 1 ? focusOutWait.promise : wait.promise,
+          kill,
+        });
+      }
+
+      if (args[1] === "wait-for") {
+        return processResult({ exited: wait.promise, kill });
+      }
+
+      return processResult({ exited: Promise.resolve(0) });
+    });
+
+    const result = await watchSessions(() => undefined, undefined, onClientFocusOut);
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual([
+      ...installHookCalls(),
+      focusEventsCall(),
+      currentClientCall(),
+      installFocusOutHookCall(),
+      waitForCall(),
+      waitForFocusOutCall(),
+    ]);
+
+    focusOutWait.resolve(0);
+    await waitForMicrotasks();
+
+    expect(onClientFocusOut).toHaveBeenCalled();
+    expect(calls).toEqual([
+      ...installHookCalls(),
+      focusEventsCall(),
+      currentClientCall(),
+      installFocusOutHookCall(),
+      waitForCall(),
+      waitForFocusOutCall(),
+      waitForFocusOutCall(),
+    ]);
+
+    if (result.ok === true) {
+      await result.watcher.stop();
+    }
+
+    expect(kill).toHaveBeenCalled();
+    expect(calls).toEqual([
+      ...installHookCalls(),
+      focusEventsCall(),
+      currentClientCall(),
+      installFocusOutHookCall(),
+      waitForCall(),
+      waitForFocusOutCall(),
+      waitForFocusOutCall(),
+      ...unsetHookCalls(),
+      unsetFocusOutHookCall(),
+    ]);
+  });
+
+  test("skips client focus-out hook when tmux focus events are disabled", async () => {
+    const wait = deferred<number>();
+    const calls: string[][] = [];
+    const kill = mock();
+    const onClientFocusOut = mock();
+
+    spyOn(Bun, "spawn").mockImplementation((command) => {
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
+
+      if (args[1] === "show-options") {
+        return processResult({ exited: Promise.resolve(0), stdout: "off\n" });
+      }
+
+      if (args[1] === "wait-for") {
+        return processResult({ exited: wait.promise, kill });
+      }
+
+      return processResult({ exited: Promise.resolve(0) });
+    });
+
+    const result = await watchSessions(() => undefined, undefined, onClientFocusOut);
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual([...installHookCalls(), focusEventsCall(), waitForCall()]);
+
+    if (result.ok === true) {
+      await result.watcher.stop();
+    }
+
+    expect(onClientFocusOut).not.toHaveBeenCalled();
+    expect(kill).toHaveBeenCalled();
+    expect(calls).toEqual([
+      ...installHookCalls(),
+      focusEventsCall(),
+      waitForCall(),
+      ...unsetHookCalls(),
+    ]);
+  });
+
   test("cleans up installed hooks when setup fails", async () => {
     const calls: string[][] = [];
 
@@ -102,6 +222,64 @@ describe("watchSessions", () => {
     expect(calls).toEqual([...installHookCalls(), waitForCall(), ...unsetHookCalls()]);
   });
 
+  test("kills both wait processes when client focus-out waiting fails", async () => {
+    const wait = deferred<number>();
+    const calls: string[][] = [];
+    const onStop = mock();
+    const sessionWaitKill = mock();
+    const focusOutWaitKill = mock();
+
+    spyOn(Bun, "spawn").mockImplementation((command) => {
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
+
+      if (args[1] === "show-options") {
+        return processResult({ exited: Promise.resolve(0), stdout: "on\n" });
+      }
+
+      if (args[1] === "display-message") {
+        return processResult({ exited: Promise.resolve(0), stdout: "/dev/pts/0\n" });
+      }
+
+      if (args[1] === "wait-for" && args[2] === focusOutChannel()) {
+        return processResult({
+          exited: Promise.resolve(1),
+          kill: focusOutWaitKill,
+          stderr: "focus wait failed",
+        });
+      }
+
+      if (args[1] === "wait-for") {
+        return processResult({ exited: wait.promise, kill: sessionWaitKill });
+      }
+
+      return processResult({ exited: Promise.resolve(0) });
+    });
+
+    const result = await watchSessions(
+      () => undefined,
+      onStop,
+      () => undefined,
+    );
+
+    expect(result.ok).toBe(true);
+    await waitForMicrotasks();
+
+    expect(onStop).toHaveBeenCalledWith("focus wait failed");
+    expect(sessionWaitKill).toHaveBeenCalledTimes(1);
+    expect(focusOutWaitKill).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      ...installHookCalls(),
+      focusEventsCall(),
+      currentClientCall(),
+      installFocusOutHookCall(),
+      waitForCall(),
+      waitForFocusOutCall(),
+      ...unsetHookCalls(),
+      unsetFocusOutHookCall(),
+    ]);
+  });
+
   test("returns a helpful message when tmux is missing", async () => {
     spyOn(Bun, "spawn").mockImplementation(() => {
       throw new Error("ENOENT");
@@ -122,6 +300,16 @@ function installHookCall(hook: (typeof hooks)[number]): string[] {
   return ["tmux", "set-hook", "-g", hookTarget(hook), `wait-for -S ${channel()}`];
 }
 
+function installFocusOutHookCall(): string[] {
+  return [
+    "tmux",
+    "set-hook",
+    "-g",
+    hookTarget("client-focus-out"),
+    `if -F "#{==:#{hook_client},/dev/pts/0}" "wait-for -S ${focusOutChannel()}"`,
+  ];
+}
+
 function unsetHookCalls(): string[][] {
   return hooks.map(unsetHookCall);
 }
@@ -130,8 +318,24 @@ function unsetHookCall(hook: (typeof hooks)[number]): string[] {
   return ["tmux", "set-hook", "-gu", hookTarget(hook)];
 }
 
+function unsetFocusOutHookCall(): string[] {
+  return ["tmux", "set-hook", "-gu", hookTarget("client-focus-out")];
+}
+
 function waitForCall(): string[] {
   return ["tmux", "wait-for", channel()];
+}
+
+function waitForFocusOutCall(): string[] {
+  return ["tmux", "wait-for", focusOutChannel()];
+}
+
+function focusEventsCall(): string[] {
+  return ["tmux", "show-options", "-gqv", "focus-events"];
+}
+
+function currentClientCall(): string[] {
+  return ["tmux", "display-message", "-p", "#{client_name}"];
 }
 
 function hookTarget(hook: string): string {
@@ -140,6 +344,10 @@ function hookTarget(hook: string): string {
 
 function channel(): string {
   return `thud-sh-sessions-${process.pid}`;
+}
+
+function focusOutChannel(): string {
+  return `thud-sh-client-focus-out-${process.pid}`;
 }
 
 function processResult(options: {

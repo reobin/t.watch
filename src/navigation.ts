@@ -47,6 +47,20 @@ export function firstPaneId(session: TmuxSession | undefined): string | undefine
   return session?.windows[0]?.panes[0]?.id;
 }
 
+export function isAttachedActivePane(sessions: TmuxSession[], paneId: string | undefined): boolean {
+  if (!paneId) {
+    return false;
+  }
+
+  return sessions.some(
+    (session) =>
+      session.attached &&
+      session.windows.some(
+        (window) => window.active && window.panes.some((pane) => pane.id === paneId && pane.active),
+      ),
+  );
+}
+
 function selectSession(
   sessions: TmuxSession[],
   sessionId: string | undefined,
