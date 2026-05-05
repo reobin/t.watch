@@ -1,90 +1,68 @@
 import type { TmuxSession } from "./tmux";
 
-export function selectNextPane(
+export function selectNextSession(
   sessions: TmuxSession[],
-  selectedPaneId: string | undefined,
-  currentPaneId: string | undefined,
+  selectedSessionId: string | undefined,
+  currentSessionId: string | undefined,
 ): string | undefined {
-  return selectPane(sessions, selectedPaneId ?? findCurrentPaneId(sessions, currentPaneId), 1);
-}
-
-export function selectPreviousPane(
-  sessions: TmuxSession[],
-  selectedPaneId: string | undefined,
-  currentPaneId: string | undefined,
-): string | undefined {
-  return selectPane(sessions, selectedPaneId ?? findCurrentPaneId(sessions, currentPaneId), -1);
-}
-
-export function hasPane(sessions: TmuxSession[], paneId: string | undefined): boolean {
-  if (!paneId) {
-    return false;
-  }
-
-  return sessions.some((session) =>
-    session.windows.some((window) => window.panes.some((pane) => pane.id === paneId)),
+  return selectSession(
+    sessions,
+    selectedSessionId ?? findCurrentSessionId(sessions, currentSessionId),
+    1,
   );
 }
 
-export function findCurrentPaneId(
+export function selectPreviousSession(
   sessions: TmuxSession[],
-  currentPaneId: string | undefined,
+  selectedSessionId: string | undefined,
+  currentSessionId: string | undefined,
 ): string | undefined {
-  if (hasPane(sessions, currentPaneId)) {
-    return currentPaneId;
-  }
-
-  for (const session of sessions) {
-    if (!session.attached) {
-      continue;
-    }
-
-    for (const window of session.windows) {
-      if (!window.active) {
-        continue;
-      }
-
-      const activePane = window.panes.find((pane) => pane.active);
-      if (activePane) {
-        return activePane.id;
-      }
-    }
-  }
-
-  return undefined;
+  return selectSession(
+    sessions,
+    selectedSessionId ?? findCurrentSessionId(sessions, currentSessionId),
+    -1,
+  );
 }
 
-export function firstPaneId(sessions: TmuxSession[]): string | undefined {
-  for (const session of sessions) {
-    for (const window of session.windows) {
-      const pane = window.panes[0];
-      if (pane) {
-        return pane.id;
-      }
-    }
-  }
-
-  return undefined;
+export function hasSession(sessions: TmuxSession[], sessionId: string | undefined): boolean {
+  return Boolean(sessionId && sessions.some((session) => session.id === sessionId));
 }
 
-function selectPane(
+export function findCurrentSessionId(
   sessions: TmuxSession[],
-  paneId: string | undefined,
+  currentSessionId: string | undefined,
+): string | undefined {
+  if (hasSession(sessions, currentSessionId)) {
+    return currentSessionId;
+  }
+
+  return sessions.find((session) => session.attached)?.id;
+}
+
+export function firstSessionId(sessions: TmuxSession[]): string | undefined {
+  return sessions[0]?.id;
+}
+
+export function firstPaneId(session: TmuxSession | undefined): string | undefined {
+  return session?.windows[0]?.panes[0]?.id;
+}
+
+function selectSession(
+  sessions: TmuxSession[],
+  sessionId: string | undefined,
   direction: 1 | -1,
 ): string | undefined {
-  const paneIds = sessions.flatMap((session) =>
-    session.windows.flatMap((window) => window.panes.map((pane) => pane.id)),
-  );
+  const sessionIds = sessions.map((session) => session.id);
 
-  if (paneIds.length === 0) {
+  if (sessionIds.length === 0) {
     return undefined;
   }
 
-  const index = paneId ? paneIds.indexOf(paneId) : -1;
+  const index = sessionId ? sessionIds.indexOf(sessionId) : -1;
 
   if (index === -1) {
-    return direction === 1 ? paneIds[0] : paneIds[paneIds.length - 1];
+    return direction === 1 ? sessionIds[0] : sessionIds[sessionIds.length - 1];
   }
 
-  return paneIds[(index + direction + paneIds.length) % paneIds.length];
+  return sessionIds[(index + direction + sessionIds.length) % sessionIds.length];
 }

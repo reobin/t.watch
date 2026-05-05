@@ -1,103 +1,107 @@
 import { describe, expect, test } from "bun:test";
 import {
-  findCurrentPaneId,
+  findCurrentSessionId,
   firstPaneId,
-  hasPane,
-  selectNextPane,
-  selectPreviousPane,
+  firstSessionId,
+  hasSession,
+  selectNextSession,
+  selectPreviousSession,
 } from "./navigation";
 import type { TmuxSession } from "./tmux";
 
-describe("pane navigation", () => {
-  test("selects the pane after the current pane when moving down with no selection", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2", true), pane("%3")] })];
+describe("session navigation", () => {
+  test("selects the session after the current session when moving down with no selection", () => {
+    const sessions = [session("$1"), session("$2", { attached: true }), session("$3")];
 
-    expect(selectNextPane(sessions, undefined, "%2")).toBe("%3");
+    expect(selectNextSession(sessions, undefined, "$2")).toBe("$3");
   });
 
-  test("selects the pane before the current pane when moving up with no selection", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2", true), pane("%3")] })];
+  test("selects the session before the current session when moving up with no selection", () => {
+    const sessions = [session("$1"), session("$2", { attached: true }), session("$3")];
 
-    expect(selectPreviousPane(sessions, undefined, "%2")).toBe("%1");
+    expect(selectPreviousSession(sessions, undefined, "$2")).toBe("$1");
   });
 
-  test("uses the active pane in an attached session when no current pane is known", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2", true), pane("%3")] })];
+  test("uses the attached session when no current session is known", () => {
+    const sessions = [session("$1"), session("$2", { attached: true }), session("$3")];
 
-    expect(selectNextPane(sessions, undefined, undefined)).toBe("%3");
-    expect(selectPreviousPane(sessions, undefined, undefined)).toBe("%1");
+    expect(selectNextSession(sessions, undefined, undefined)).toBe("$3");
+    expect(selectPreviousSession(sessions, undefined, undefined)).toBe("$1");
   });
 
   test("wraps when moving from an existing selection", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2"), pane("%3")] })];
+    const sessions = [session("$1"), session("$2"), session("$3")];
 
-    expect(selectNextPane(sessions, "%3", undefined)).toBe("%1");
-    expect(selectPreviousPane(sessions, "%1", undefined)).toBe("%3");
+    expect(selectNextSession(sessions, "$3", undefined)).toBe("$1");
+    expect(selectPreviousSession(sessions, "$1", undefined)).toBe("$3");
   });
 
-  test("falls back to the list ends when no current pane is available", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2")], attached: false })];
+  test("falls back to the list ends when no current session is available", () => {
+    const sessions = [session("$1"), session("$2")];
 
-    expect(selectNextPane(sessions, undefined, undefined)).toBe("%1");
-    expect(selectPreviousPane(sessions, undefined, undefined)).toBe("%2");
+    expect(selectNextSession(sessions, undefined, undefined)).toBe("$1");
+    expect(selectPreviousSession(sessions, undefined, undefined)).toBe("$2");
   });
 
-  test("checks if a pane still exists", () => {
-    const sessions = [session({ panes: [pane("%1")] })];
+  test("checks if a session still exists", () => {
+    const sessions = [session("$1")];
 
-    expect(hasPane(sessions, "%1")).toBe(true);
-    expect(hasPane(sessions, "%2")).toBe(false);
-    expect(hasPane(sessions, undefined)).toBe(false);
+    expect(hasSession(sessions, "$1")).toBe(true);
+    expect(hasSession(sessions, "$2")).toBe(false);
+    expect(hasSession(sessions, undefined)).toBe(false);
   });
 
-  test("finds the current attached active pane", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2", true), pane("%3")] })];
+  test("finds the current attached session", () => {
+    const sessions = [session("$1"), session("$2", { attached: true }), session("$3")];
 
-    expect(findCurrentPaneId(sessions, undefined)).toBe("%2");
+    expect(findCurrentSessionId(sessions, undefined)).toBe("$2");
   });
 
-  test("prefers an explicit current pane when it exists", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2", true), pane("%3")] })];
+  test("prefers an explicit current session when it exists", () => {
+    const sessions = [session("$1"), session("$2", { attached: true }), session("$3")];
 
-    expect(findCurrentPaneId(sessions, "%3")).toBe("%3");
+    expect(findCurrentSessionId(sessions, "$3")).toBe("$3");
   });
 
-  test("finds the first pane in render order", () => {
-    const sessions = [session({ panes: [pane("%1"), pane("%2")] })];
+  test("finds the first session in render order", () => {
+    const sessions = [session("$1"), session("$2")];
 
-    expect(firstPaneId(sessions)).toBe("%1");
-    expect(firstPaneId([])).toBeUndefined();
+    expect(firstSessionId(sessions)).toBe("$1");
+    expect(firstSessionId([])).toBeUndefined();
+  });
+
+  test("finds the first pane in the first window", () => {
+    expect(firstPaneId(session("$1", { paneIds: ["%1", "%2"] }))).toBe("%1");
+    expect(firstPaneId(session("$1", { paneIds: [] }))).toBeUndefined();
+    expect(firstPaneId(undefined)).toBeUndefined();
   });
 });
 
-function session(input: {
-  attached?: boolean;
-  panes: TmuxSession["windows"][number]["panes"];
-}): TmuxSession {
+function session(id: string, input: { attached?: boolean; paneIds?: string[] } = {}): TmuxSession {
   return {
-    id: "$1",
-    name: "work",
+    id,
+    name: id,
     windows: [
       {
         id: "@1",
         index: 1,
         name: "work",
         active: true,
-        panes: input.panes,
+        panes: (input.paneIds ?? ["%1"]).map(pane),
       },
     ],
-    attached: input.attached ?? true,
+    attached: input.attached ?? false,
     sshAttached: false,
     createdAt: new Date(0),
     activityAt: new Date(0),
   };
 }
 
-function pane(id: string, active = false): TmuxSession["windows"][number]["panes"][number] {
+function pane(id: string): TmuxSession["windows"][number]["panes"][number] {
   return {
     id,
     index: Number(id.slice(1)),
-    active,
+    active: false,
     command: "bash",
     title: "bash",
     processName: "bash",
