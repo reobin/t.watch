@@ -82,15 +82,11 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.intent).toBe("indexed");
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === " working")?.attributes).toBe(
-      createTextAttributes({ dim: true }),
-    );
+    expect(output.chunks.find((chunk) => chunk.text === " working")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "work")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "work")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === "· /repo/work")?.attributes).toBe(
-      createTextAttributes({ dim: true }),
-    );
+    expect(output.chunks.find((chunk) => chunk.text === "· /repo/work")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === "· main*")?.fg?.slot).toBe(8);
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server");
@@ -271,6 +267,36 @@ describe("render", () => {
     const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
 
     expect(paneChunk?.bg?.equals(selectedBg)).toBe(true);
+  });
+
+  test("uses a custom muted foreground", () => {
+    const textMutedFg = RGBA.fromInts(85, 85, 85);
+    const output = renderSessions(
+      [
+        session({
+          path: "/repo/work",
+          windows: [
+            window({
+              panes: [
+                pane({
+                  processName: "opencode",
+                  integration: { tool: "opencode", status: "unknown" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      undefined,
+      { textMutedFg },
+    );
+    const pathChunk = output.chunks.find((chunk) => chunk.text === "· /repo/work");
+    const statusLabelChunk = output.chunks.find((chunk) => chunk.text === " unknown");
+    const unknownStatusChunk = output.chunks.find((chunk) => chunk.text === "●");
+
+    expect(pathChunk?.fg?.equals(textMutedFg)).toBe(true);
+    expect(statusLabelChunk?.fg?.equals(textMutedFg)).toBe(true);
+    expect(unknownStatusChunk?.fg?.equals(textMutedFg)).toBe(true);
   });
 
   test("keeps session text aligned when selection changes", () => {

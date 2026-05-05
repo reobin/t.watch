@@ -1,4 +1,4 @@
-import { RGBA, createCliRenderer, type CliRenderer, type TerminalColors } from "@opentui/core";
+import { createCliRenderer } from "@opentui/core";
 import {
   checkTmux,
   focusPaneForAllClients,
@@ -9,6 +9,7 @@ import {
 } from "./tmux";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import { createScreen } from "./screen";
+import { detectRenderTheme } from "./theme";
 import {
   findCurrentSessionId,
   firstPaneId,
@@ -20,7 +21,6 @@ import {
 
 const refreshIntervalMs = 1500;
 const paletteTimeoutMs = 100;
-const selectedBgBlend = 0.08;
 
 export async function startApp(): Promise<void> {
   let isDestroyed = false;
@@ -47,7 +47,7 @@ export async function startApp(): Promise<void> {
   });
 
   const screen = createScreen(renderer, renderLoading());
-  const selectedBg = await detectSelectedBackground(renderer);
+  const renderTheme = await detectRenderTheme(renderer, paletteTimeoutMs);
   terminalWidth = renderer.width;
 
   renderer.on("resize", (width) => {
@@ -173,7 +173,7 @@ export async function startApp(): Promise<void> {
 
     screen.setContent(
       renderSessions(sessions, selectedSessionId, {
-        selectedBg,
+        ...renderTheme,
         width: terminalWidth,
       }),
     );
@@ -204,40 +204,4 @@ export async function startApp(): Promise<void> {
       isFocusingSession = false;
     }
   }
-}
-
-async function detectSelectedBackground(renderer: CliRenderer): Promise<RGBA> {
-  const colors = await renderer
-    .getPalette({ timeout: paletteTimeoutMs })
-    .catch((): TerminalColors | undefined => undefined);
-  const selectedBg = colors && selectedBackgroundFromTerminal(colors);
-
-  if (selectedBg) {
-    return selectedBg;
-  }
-
-  const themeMode = renderer.themeMode ?? (await renderer.waitForThemeMode(paletteTimeoutMs));
-
-  return RGBA.fromIndex(themeMode === "light" ? 254 : 235);
-}
-
-function selectedBackgroundFromTerminal(colors: TerminalColors): RGBA | undefined {
-  if (!colors.defaultBackground || !colors.defaultForeground) {
-    return undefined;
-  }
-
-  const foreground = RGBA.fromHex(colors.defaultForeground);
-  const background = RGBA.fromHex(colors.defaultBackground);
-  const [foregroundRed, foregroundGreen, foregroundBlue] = foreground.toInts();
-  const [backgroundRed, backgroundGreen, backgroundBlue] = background.toInts();
-
-  return RGBA.fromInts(
-    blendColor(backgroundRed, foregroundRed),
-    blendColor(backgroundGreen, foregroundGreen),
-    blendColor(backgroundBlue, foregroundBlue),
-  );
-}
-
-function blendColor(base: number, overlay: number): number {
-  return Math.round(base + (overlay - base) * selectedBgBlend);
 }
