@@ -10,7 +10,8 @@ Install globally from npm:
 
 ```sh
 npm install -g thud.sh
-thud.sh
+thud version
+thud
 ```
 
 Or run from source:
