@@ -169,7 +169,7 @@ describe("listSessions", () => {
         "list-panes",
         "-a",
         "-F",
-        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@thud_sh_tool}\x1f#{@thud_sh_status}\x1f#{@thud_sh_status_label}\x1f#{@thud_sh_status_updated_at}",
+        "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@thud_sh_tool}\x1f#{@thud_sh_status}\x1f#{@thud_sh_status_label}\x1f#{@thud_sh_status_updated_at}\x1f#{pane_current_path}",
       ],
       ["tmux", "list-clients", "-F", "#{session_id}\x1f#{client_pid}"],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
@@ -435,6 +435,184 @@ describe("listSessions", () => {
     });
   });
 
+  test("uses the runtime target as the pane name", async () => {
+    mockSinglePaneTmux({
+      pane: ["$1", "@1", "%1", "1", "1", "node", "10", "shell"],
+      process: "100 10 node node /home/reobin/.local/bin/opencode",
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "node",
+                  processName: "opencode",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("uses runtime args when process comm is decorated", async () => {
+    mockSinglePaneTmux({
+      pane: ["$1", "@1", "%1", "1", "1", "node", "10", "shell"],
+      process:
+        "100 10 node-MainThread node /home/reobin/.local/share/mise/installs/node/25.9.0/bin/ocv",
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "node",
+                  processName: "opencode",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("keeps runtime names when flags obscure the target", async () => {
+    mockSinglePaneTmux({
+      pane: ["$1", "@1", "%1", "1", "1", "node", "10", "shell"],
+      process: "100 10 node node --loader ts-node/esm ./src/index.ts",
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "node",
+                  processName: "node",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("uses package bin names for runtime package entrypoints", async () => {
+    const projectPath = process.cwd();
+
+    mockSinglePaneTmux({
+      pane: ["$1", "@1", "%1", "1", "1", "bun", "10", "shell", "", "", "", "", projectPath],
+      process: `100 10 bun bun ${projectPath}/dist/index.js`,
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "bun",
+                  processName: "thud",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("uses package bin names for runtime targets outside the pane cwd", async () => {
+    const projectPath = process.cwd();
+
+    mockSinglePaneTmux({
+      pane: ["$1", "@1", "%1", "1", "1", "bun", "10", "shell", "", "", "", "", "/"],
+      process: `100 10 bun bun ${projectPath}/dist/index.js`,
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "bun",
+                  processName: "thud",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("keeps runtime names for package scripts over stale integration", async () => {
+    const projectPath = process.cwd();
+
+    mockSinglePaneTmux({
+      pane: [
+        "$1",
+        "@1",
+        "%1",
+        "1",
+        "1",
+        "bun",
+        "10",
+        "shell",
+        "opencode",
+        "idle",
+        "",
+        "",
+        projectPath,
+      ],
+      process: "100 10 bun bun start",
+    });
+
+    const result = await listSessions();
+
+    expect(result).toMatchObject({
+      ok: true,
+      sessions: [{ windows: [{ panes: [{ command: "bun", processName: "bun" }] }] }],
+    });
+
+    if (result.ok) {
+      expect(result.sessions[0]?.windows[0]?.panes[0]?.integration).toBeUndefined();
+    }
+  });
+
+  test("keeps runtime names when flags precede package scripts", async () => {
+    const projectPath = process.cwd();
+
+    mockSinglePaneTmux({
+      pane: ["$1", "@1", "%1", "1", "1", "bun", "10", "shell", "", "", "", "", projectPath],
+      process: "100 10 bun bun --hot run dev",
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [{ windows: [{ panes: [{ command: "bun", processName: "bun" }] }] }],
+    });
+  });
+
   test("keeps editor panes named after the editor", async () => {
     mockTmux({
       results: [
@@ -571,4 +749,28 @@ function mockTmux(input: {
   });
 
   return calls;
+}
+
+function mockSinglePaneTmux(input: { pane: string[]; process: string }): void {
+  mockTmux({
+    results: [
+      {
+        exitCode: 0,
+        stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+      },
+      {
+        exitCode: 0,
+        stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+      },
+      {
+        exitCode: 0,
+        stdout: input.pane.join("\x1f"),
+      },
+      { exitCode: 0, stdout: "" },
+      {
+        exitCode: 0,
+        stdout: input.process,
+      },
+    ],
+  });
 }

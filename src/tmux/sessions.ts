@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { dirname, normalize, resolve as resolvePath } from "node:path";
 import { missingTmuxMessage, runTmux } from "./commands";
 import type {
   TmuxPane,
@@ -36,6 +38,7 @@ const paneFormat = [
   "#{@thud_sh_status}",
   "#{@thud_sh_status_label}",
   "#{@thud_sh_status_updated_at}",
+  "#{pane_current_path}",
 ].join(fieldSeparator);
 const clientFormat = ["#{session_id}", "#{client_pid}"].join(fieldSeparator);
 
@@ -43,6 +46,7 @@ type PaneRecord = Omit<TmuxPane, "ssh"> & {
   sessionId: string;
   windowId: string;
   pid: number;
+  currentPath: string;
 };
 
 type ProcessInfo = {
@@ -69,8 +73,11 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
         listProcesses(),
       ]);
       const processTree = createProcessTree(processes);
+      const processesByPid = new Map(
+        processes.map((processInfo) => [processInfo.pid, processInfo]),
+      );
       const sshAttachedSessions = listSshAttachedSessions(clients, processes);
-      const panesByWindow = groupPanesByWindow(panes, processTree);
+      const panesByWindow = groupPanesByWindow(panes, processTree, processesByPid);
       const windowsBySession = groupWindowsBySession(windows, panesByWindow);
 
       return {
@@ -208,6 +215,7 @@ function parsePane(line: string): PaneRecord {
     integrationStatus,
     integrationLabel,
     integrationUpdatedAt,
+    currentPath,
   ] = line.split(fieldSeparator);
 
   const integration = parsePaneIntegration(
@@ -226,6 +234,7 @@ function parsePane(line: string): PaneRecord {
     command: command ?? "",
     title: title ?? "",
     pid: Number(pid),
+    currentPath: currentPath ?? "",
     processName: command ?? "",
     ...(integration ? { integration } : {}),
   };
@@ -335,13 +344,14 @@ function isSshdCommand(command: string): boolean {
 function groupPanesByWindow(
   panes: PaneRecord[],
   processTree: Map<number, ProcessInfo[]>,
+  processesByPid: Map<number, ProcessInfo>,
 ): Map<string, TmuxPane[]> {
   const panesByWindow = new Map<string, TmuxPane[]>();
 
   for (const pane of panes) {
     const key = paneKey(pane.sessionId, pane.windowId);
     const windowPanes = panesByWindow.get(key) ?? [];
-    const processName = resolvePaneProcessName(pane);
+    const processName = resolvePaneProcessName(pane, processTree, processesByPid);
     const integration = pane.integration?.tool === processName ? pane.integration : undefined;
 
     windowPanes.push({
@@ -399,12 +409,126 @@ function isSshPane(pane: PaneRecord, processTree: Map<number, ProcessInfo[]>): b
   );
 }
 
-function resolvePaneProcessName(pane: PaneRecord): string {
+function resolvePaneProcessName(
+  pane: PaneRecord,
+  processTree: Map<number, ProcessInfo[]>,
+  processesByPid: Map<number, ProcessInfo>,
+): string {
   if (pane.title.startsWith("OC |")) {
     return "opencode";
   }
 
+  if (isRuntimeCommand(pane.command)) {
+    return (
+      resolveRuntimeProcessName(pane, processTree, processesByPid) ??
+      prettifyProcessName(pane.command)
+    );
+  }
+
   return prettifyProcessName(pane.command);
+}
+
+function resolveRuntimeProcessName(
+  pane: PaneRecord,
+  processTree: Map<number, ProcessInfo[]>,
+  processesByPid: Map<number, ProcessInfo>,
+): string | undefined {
+  const processInfo = findRuntimeProcess(pane, processTree, processesByPid);
+  const parts = (processInfo?.args ?? "").split(/\s+/).filter(Boolean);
+
+  if (basename(parts[0] ?? "") === basename(pane.command)) {
+    parts.shift();
+  }
+
+  if (parts[0] === "run") {
+    parts.shift();
+  }
+
+  const target = parts.find((part) => !part.startsWith("-"));
+
+  if (!target) {
+    return undefined;
+  }
+
+  return runtimeBinNameForTarget(target, pane.currentPath);
+}
+
+function findRuntimeProcess(
+  pane: PaneRecord,
+  processTree: Map<number, ProcessInfo[]>,
+  processesByPid: Map<number, ProcessInfo>,
+): ProcessInfo | undefined {
+  const candidates = [
+    processesByPid.get(pane.pid),
+    ...listDescendants(pane.pid, processTree),
+  ].filter((processInfo): processInfo is ProcessInfo => Boolean(processInfo));
+  const command = basename(pane.command);
+
+  return (
+    candidates.find((processInfo) => processRunsCommand(processInfo, command)) ??
+    candidates.find((processInfo) => isRuntimeCommand(processInfo.command))
+  );
+}
+
+function processRunsCommand(processInfo: ProcessInfo, command: string): boolean {
+  if (basename(processInfo.command) === command) {
+    return true;
+  }
+
+  const firstArg = processInfo.args.split(/\s+/).filter(Boolean)[0];
+
+  return basename(firstArg ?? "") === command;
+}
+
+function runtimeBinNameForTarget(target: string, currentPath: string): string | undefined {
+  const targetPath = normalize(resolvePath(currentPath || process.cwd(), target));
+
+  return packageBinNameForRuntimeTarget(targetPath) ?? binDirectoryTargetName(target);
+}
+
+function binDirectoryTargetName(target: string): string | undefined {
+  const parts = target.split("/").filter(Boolean);
+  const binIndex = Math.max(parts.lastIndexOf(".bin"), parts.lastIndexOf("bin"));
+
+  if (binIndex < 0) {
+    return undefined;
+  }
+
+  const name = parts.at(binIndex + 1);
+
+  return name ? prettifyProcessName(name) : undefined;
+}
+
+function packageBinNameForRuntimeTarget(targetPath: string): string | undefined {
+  for (let dir = dirname(targetPath); ; dir = dirname(dir)) {
+    const parent = dirname(dir);
+
+    try {
+      const parsed = JSON.parse(readFileSync(resolvePath(dir, "package.json"), "utf8")) as {
+        name?: unknown;
+        bin?: unknown;
+      };
+      const entries =
+        typeof parsed.bin === "string" && typeof parsed.name === "string"
+          ? [[parsed.name.split("/").at(-1) ?? parsed.name, parsed.bin]]
+          : Object.entries(typeof parsed.bin === "object" && parsed.bin !== null ? parsed.bin : {});
+
+      for (const [name, binTarget] of entries) {
+        if (
+          typeof binTarget === "string" &&
+          normalize(resolvePath(dir, binTarget)) === targetPath
+        ) {
+          return prettifyProcessName(name);
+        }
+      }
+
+      return undefined;
+    } catch {}
+
+    if (parent === dir) {
+      return undefined;
+    }
+  }
 }
 
 function listDescendants(pid: number, processTree: Map<number, ProcessInfo[]>): ProcessInfo[] {
@@ -433,6 +557,10 @@ function prettifyProcessName(name: string): string {
   }
 
   return base || "shell";
+}
+
+function isRuntimeCommand(command: string): boolean {
+  return ["node", "bun", "python", "python3", "ruby", "perl", "deno"].includes(basename(command));
 }
 
 function basename(path: string): string {
