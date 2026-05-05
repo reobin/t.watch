@@ -1,4 +1,4 @@
-import { createCliRenderer } from "@opentui/core";
+import { RGBA, createCliRenderer, type CliRenderer, type TerminalColors } from "@opentui/core";
 import {
   checkTmux,
   focusPaneForAllClients,
@@ -10,25 +10,28 @@ import {
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import { createScreen } from "./screen";
 import {
-  findCurrentPaneId,
+  findCurrentSessionId,
   firstPaneId,
-  hasPane,
-  selectNextPane,
-  selectPreviousPane,
+  firstSessionId,
+  hasSession,
+  selectNextSession,
+  selectPreviousSession,
 } from "./navigation";
 
 const refreshIntervalMs = 1500;
+const paletteTimeoutMs = 100;
+const selectedBgBlend = 0.08;
 
 export async function startApp(): Promise<void> {
   let isDestroyed = false;
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let sessionWatcher: TmuxSessionWatcher | undefined;
   let isStartingWatcher = false;
-  let isFocusingPane = false;
-  let selectedPaneId: string | undefined;
-  let isSelectingPane = false;
-  let currentPaneId: string | undefined;
+  let isFocusingSession = false;
+  let selectedSessionId: string | undefined;
+  let currentSessionId: string | undefined;
   let sessions: TmuxSession[] = [];
+  let terminalWidth = 0;
 
   const renderer = await createCliRenderer({
     exitOnCtrlC: true,
@@ -44,6 +47,16 @@ export async function startApp(): Promise<void> {
   });
 
   const screen = createScreen(renderer, renderLoading());
+  const selectedBg = await detectSelectedBackground(renderer);
+  terminalWidth = renderer.width;
+
+  renderer.on("resize", (width) => {
+    terminalWidth = width;
+    if (sessions.length > 0) {
+      renderCurrentSessions();
+    }
+  });
+
   renderer.keyInput.on("keypress", (key) => {
     if (key.ctrl || key.meta) {
       return;
@@ -51,23 +64,21 @@ export async function startApp(): Promise<void> {
 
     if (key.name === "j") {
       key.preventDefault();
-      selectedPaneId = selectNextPane(sessions, selectedPaneId, currentPaneId);
-      isSelectingPane = true;
+      selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentSessions();
       return;
     }
 
     if (key.name === "k") {
       key.preventDefault();
-      selectedPaneId = selectPreviousPane(sessions, selectedPaneId, currentPaneId);
-      isSelectingPane = true;
+      selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentSessions();
       return;
     }
 
     if (key.name === "enter" || key.name === "return") {
       key.preventDefault();
-      void focusSelectedPane();
+      void focusSelectedSession();
     }
   });
   const tmux = await checkTmux();
@@ -128,24 +139,23 @@ export async function startApp(): Promise<void> {
 
     if (result.ok === false) {
       sessions = [];
-      selectedPaneId = undefined;
-      isSelectingPane = false;
-      currentPaneId = undefined;
+      selectedSessionId = undefined;
+      currentSessionId = undefined;
       screen.setContent(renderMessage(result.message));
       return;
     }
 
     sessions = result.sessions;
-    const nextCurrentPaneId = findCurrentPaneId(sessions, undefined) ?? firstPaneId(sessions);
+    const nextCurrentSessionId =
+      findCurrentSessionId(sessions, undefined) ?? firstSessionId(sessions);
     if (
-      currentPaneId !== nextCurrentPaneId ||
-      !hasPane(sessions, selectedPaneId) ||
-      selectedPaneId === undefined
+      currentSessionId !== nextCurrentSessionId ||
+      !hasSession(sessions, selectedSessionId) ||
+      selectedSessionId === undefined
     ) {
-      selectedPaneId = nextCurrentPaneId;
-      isSelectingPane = false;
+      selectedSessionId = nextCurrentSessionId;
     }
-    currentPaneId = nextCurrentPaneId;
+    currentSessionId = nextCurrentSessionId;
 
     if (sessions.length === 0) {
       screen.setContent(renderNoSessions());
@@ -161,27 +171,73 @@ export async function startApp(): Promise<void> {
       return;
     }
 
-    screen.setContent(renderSessions(sessions, selectedPaneId, isSelectingPane));
+    screen.setContent(
+      renderSessions(sessions, selectedSessionId, {
+        selectedBg,
+        width: terminalWidth,
+      }),
+    );
   }
 
-  async function focusSelectedPane(): Promise<void> {
-    if (!selectedPaneId || isFocusingPane) {
+  async function focusSelectedSession(): Promise<void> {
+    if (!selectedSessionId || isFocusingSession) {
       return;
     }
 
-    isFocusingPane = true;
+    const paneId = firstPaneId(sessions.find((session) => session.id === selectedSessionId));
+
+    if (!paneId) {
+      return;
+    }
+
+    isFocusingSession = true;
     try {
-      const result = await focusPaneForAllClients(selectedPaneId);
+      const result = await focusPaneForAllClients(paneId);
 
       if (result.ok === false) {
         screen.setContent(renderMessage(result.message));
         return;
       }
 
-      isSelectingPane = false;
       await refreshSessions();
     } finally {
-      isFocusingPane = false;
+      isFocusingSession = false;
     }
   }
+}
+
+async function detectSelectedBackground(renderer: CliRenderer): Promise<RGBA> {
+  const colors = await renderer
+    .getPalette({ timeout: paletteTimeoutMs })
+    .catch((): TerminalColors | undefined => undefined);
+  const selectedBg = colors && selectedBackgroundFromTerminal(colors);
+
+  if (selectedBg) {
+    return selectedBg;
+  }
+
+  const themeMode = renderer.themeMode ?? (await renderer.waitForThemeMode(paletteTimeoutMs));
+
+  return RGBA.fromIndex(themeMode === "light" ? 254 : 235);
+}
+
+function selectedBackgroundFromTerminal(colors: TerminalColors): RGBA | undefined {
+  if (!colors.defaultBackground || !colors.defaultForeground) {
+    return undefined;
+  }
+
+  const foreground = RGBA.fromHex(colors.defaultForeground);
+  const background = RGBA.fromHex(colors.defaultBackground);
+  const [foregroundRed, foregroundGreen, foregroundBlue] = foreground.toInts();
+  const [backgroundRed, backgroundGreen, backgroundBlue] = background.toInts();
+
+  return RGBA.fromInts(
+    blendColor(backgroundRed, foregroundRed),
+    blendColor(backgroundGreen, foregroundGreen),
+    blendColor(backgroundBlue, foregroundBlue),
+  );
+}
+
+function blendColor(base: number, overlay: number): number {
+  return Math.round(base + (overlay - base) * selectedBgBlend);
 }

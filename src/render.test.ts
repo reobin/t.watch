@@ -1,20 +1,20 @@
 import { homedir } from "node:os";
 import { describe, expect, test } from "bun:test";
-import { createTextAttributes } from "@opentui/core";
+import { RGBA, createTextAttributes } from "@opentui/core";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import type { TmuxSession } from "./tmux";
 
 describe("render", () => {
-  test("renders a message with the app title", () => {
-    expect(renderMessage("Something happened.")).toBe("thud.sh\n\nSomething happened.");
+  test("renders a message", () => {
+    expect(renderMessage("Something happened.")).toBe("Something happened.");
   });
 
   test("renders the loading state", () => {
-    expect(renderLoading()).toBe("thud.sh\n\nLoading tmux sessions...");
+    expect(renderLoading()).toBe("Loading tmux sessions...");
   });
 
   test("renders the empty sessions state", () => {
-    expect(renderNoSessions()).toBe("thud.sh\n\nNo tmux sessions running.");
+    expect(renderNoSessions()).toBe("No tmux sessions running.");
   });
 
   test("renders session names", () => {
@@ -58,25 +58,23 @@ describe("render", () => {
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
-        "thud.sh",
-        "",
-        "● work",
+        "  work",
         "  · /repo/work",
         "  · main*",
         "  ╭─ opencode ● working",
         "  ╰─ bash",
         "  ╶─ bun",
-        "● notes <ssh>",
+        "  notes <ssh>",
         "  ╶─ vim",
       ].join("\n"),
     );
-    expect(output.chunks.find((chunk) => chunk.text === "● work")?.attributes).toBe(
+    expect(output.chunks.find((chunk) => chunk.text === "work")?.attributes).toBe(
       createTextAttributes({ bold: true }),
     );
-    expect(output.chunks.find((chunk) => chunk.text === "● notes <ssh>")?.attributes).toBe(
+    expect(output.chunks.find((chunk) => chunk.text === "notes <ssh>")?.attributes).toBe(
       createTextAttributes({ bold: true }),
     );
-    expect(output.chunks.find((chunk) => chunk.text === "● notes <ssh>")?.fg?.slot).toBe(5);
+    expect(output.chunks.find((chunk) => chunk.text === "notes <ssh>")?.fg?.slot).toBe(5);
     expect(output.chunks.find((chunk) => chunk.text === " opencode")?.attributes).toBe(
       createTextAttributes({ bold: true }),
     );
@@ -88,12 +86,12 @@ describe("render", () => {
       createTextAttributes({ dim: true }),
     );
     expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(8);
-    expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg).toBeDefined();
-    expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === "\n  · /repo/work")?.attributes).toBe(
+    expect(output.chunks.find((chunk) => chunk.text === "work")?.fg).toBeDefined();
+    expect(output.chunks.find((chunk) => chunk.text === "work")?.fg?.slot).toBe(6);
+    expect(output.chunks.find((chunk) => chunk.text === "· /repo/work")?.attributes).toBe(
       createTextAttributes({ dim: true }),
     );
-    expect(output.chunks.find((chunk) => chunk.text === "\n  · main*")?.fg?.slot).toBe(8);
+    expect(output.chunks.find((chunk) => chunk.text === "· main*")?.fg?.slot).toBe(8);
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window");
@@ -113,7 +111,7 @@ describe("render", () => {
     ]);
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
-      ["thud.sh", "", "○ session", "  · ~/dev/thud.sh", "  · main", "  ╶─ bash"].join("\n"),
+      ["  session", "  · ~/dev/thud.sh", "  · main", "  ╶─ bash"].join("\n"),
     );
   });
 
@@ -212,7 +210,7 @@ describe("render", () => {
     expect(inactivePaneChunk?.fg).toBeUndefined();
   });
 
-  test("renders the selected pane as a highlighted row", () => {
+  test("renders the selected session as a highlighted block", () => {
     const output = renderSessions(
       [
         session({
@@ -226,55 +224,91 @@ describe("render", () => {
           ],
         }),
       ],
-      "%2",
-      true,
+      "$1",
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const activePaneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
-    const selectedBorderChunk = output.chunks.find((chunk) => chunk.text === "\n▎ ");
-    const selectedPaneChunk = output.chunks.find((chunk) => chunk.text === " bash");
+    const selectedBorderChunk = output.chunks.find((chunk) => chunk.text === "▎ ");
+    const selectedSessionPaneChunk = output.chunks.find((chunk) => chunk.text === " bash");
     const selectedBranchChunk = output.chunks.find((chunk) => chunk.text === "╰─");
 
-    expect(text).toContain("  ╭─ opencode");
+    expect(text).toContain("▎ ╭─ opencode");
     expect(text).toContain("▎ ╰─ bash");
     expect(text).not.toContain(">");
     expect(selectedBorderChunk?.fg?.slot).toBe(14);
     expect(selectedBorderChunk?.bg?.slot).toBe(235);
-    expect(selectedPaneChunk?.fg).toBeUndefined();
-    expect(selectedPaneChunk?.bg?.slot).toBe(235);
+    expect(selectedSessionPaneChunk?.fg).toBeUndefined();
+    expect(selectedSessionPaneChunk?.bg?.slot).toBe(235);
     expect(selectedBranchChunk?.fg?.slot).toBe(8);
     expect(selectedBranchChunk?.bg?.slot).toBe(235);
-    expect(activePaneChunk?.bg).toBeUndefined();
+    expect(activePaneChunk?.bg?.slot).toBe(235);
     expect(activePaneChunk?.attributes).toBe(0);
   });
 
-  test("hides selected row highlighting when not actively selecting", () => {
+  test("keeps selected session highlighting when not actively selecting", () => {
     const output = renderSessions(
       [
         session({
           windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
         }),
       ],
-      "%1",
-      false,
+      "$1",
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
 
-    expect(text).toContain("  ╶─ opencode");
-    expect(text).not.toContain("▎ ╶─ opencode");
-    expect(paneChunk?.bg).toBeUndefined();
+    expect(text).toContain("▎ ╶─ opencode");
+    expect(paneChunk?.bg?.slot).toBe(235);
   });
 
-  test("shows selected row highlighting on the current pane while actively selecting", () => {
+  test("uses a custom selected session background", () => {
+    const selectedBg = RGBA.fromInts(245, 245, 245);
+    const output = renderSessions(
+      [session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] })],
+      "$1",
+      { selectedBg },
+    );
+    const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+
+    expect(paneChunk?.bg?.equals(selectedBg)).toBe(true);
+  });
+
+  test("keeps session text aligned when selection changes", () => {
+    const sessions = [
+      session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] }),
+    ];
+    const unselectedText = renderSessions(sessions)
+      .chunks.map((chunk) => chunk.text)
+      .join("");
+    const selectedText = renderSessions(sessions, "$1")
+      .chunks.map((chunk) => chunk.text)
+      .join("");
+
+    expect(selectedText.indexOf("opencode")).toBe(unselectedText.indexOf("opencode"));
+  });
+
+  test("pads selected session rows to the terminal width", () => {
+    const output = renderSessions(
+      [session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] })],
+      "$1",
+      { width: 20 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const selectedPaddingChunk = output.chunks.find((chunk) => chunk.text === "       ");
+
+    expect(text).toContain("▎ default           ");
+    expect(text).toContain("▎ ╶─ opencode       ");
+    expect(selectedPaddingChunk?.bg?.slot).toBe(235);
+  });
+
+  test("shows selected session highlighting", () => {
     const output = renderSessions(
       [
         session({
           windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
         }),
       ],
-      "%1",
-      true,
+      "$1",
     );
     const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
 

@@ -2,7 +2,6 @@ import { homedir } from "node:os";
 import { RGBA, StyledText, bold, dim, fg, type TextChunk } from "@opentui/core";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
-const title = "thud.sh";
 const palette = {
   red: 1,
   green: 2,
@@ -13,12 +12,17 @@ const palette = {
   selectedBg: 235,
 } as const;
 
+export type RenderTheme = {
+  selectedBg?: RGBA;
+  width?: number;
+};
+
 export function renderLoading(): string {
   return renderMessage("Loading tmux sessions...");
 }
 
 export function renderMessage(message: string): string {
-  return `${title}\n\n${message}`;
+  return message;
 }
 
 export function renderNoSessions(): string {
@@ -27,37 +31,37 @@ export function renderNoSessions(): string {
 
 export function renderSessions(
   sessions: TmuxSession[],
-  selectedPaneId?: string,
-  showSelectedPane = false,
+  selectedSessionId?: string,
+  theme: RenderTheme = {},
 ): StyledText {
-  return new StyledText([
-    bold(title),
-    textChunk("\n\n"),
-    ...sessions.flatMap((session, index) => [
+  const selectedBg = theme.selectedBg ?? RGBA.fromIndex(palette.selectedBg);
+
+  return new StyledText(
+    sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
-      ...renderSession(session, selectedPaneId, showSelectedPane),
+      ...renderSession(session, selectedSessionId, selectedBg, theme.width),
     ]),
-  ]);
+  );
 }
 
 function renderSession(
   session: TmuxSession,
-  selectedPaneId: string | undefined,
-  showSelectedPane: boolean,
+  selectedSessionId: string | undefined,
+  selectedBg: RGBA,
+  width: number | undefined,
 ): TextChunk[] {
-  const marker = session.attached ? "●" : "○";
-  const header = `${marker} ${session.name}${session.sshAttached ? " <ssh>" : ""}`;
+  const header = `${session.name}${session.sshAttached ? " <ssh>" : ""}`;
   const chunks: TextChunk[] = [
     renderSessionHeader(header, session),
     ...renderSessionMetadata(session),
   ];
+  const isSelectedSession = session.id === selectedSessionId;
 
   session.windows.forEach((window) => {
     window.panes.forEach((pane, paneIndex) => {
-      const isSelected = showSelectedPane && pane.id === selectedPaneId;
       const branch = windowPaneBranch(window.panes.length, paneIndex);
       const rowChunks = [
-        muted("\n  "),
+        muted("\n"),
         muted(branch),
         ...renderPaneName(
           pane,
@@ -66,11 +70,11 @@ function renderSession(
         ),
       ];
 
-      chunks.push(...(isSelected ? selectedRow(rowChunks) : rowChunks));
+      chunks.push(...rowChunks);
     });
   });
 
-  return chunks;
+  return sessionBlock(chunks, isSelectedSession, selectedBg, width);
 }
 
 function renderSessionMetadata(session: TmuxSession): TextChunk[] {
@@ -78,7 +82,7 @@ function renderSessionMetadata(session: TmuxSession): TextChunk[] {
     (line): line is string => Boolean(line),
   );
 
-  return lines.map((line) => muted(`\n  · ${line}`));
+  return lines.map((line) => muted(`\n· ${line}`));
 }
 
 function formatPath(path: string): string {
@@ -175,25 +179,72 @@ function active(text: string): TextChunk {
   return bold(terminalFg(palette.cyan, text));
 }
 
-function selectedRow(chunks: TextChunk[]): TextChunk[] {
-  return chunks.map((chunk, index) => {
-    if (index === 0) {
-      return selected({
-        ...chunk,
-        text: "\n▎ ",
-        fg: RGBA.fromIndex(palette.brightCyan),
-      });
-    }
-
-    return selected(chunk);
-  });
-}
-
-function selected(chunk: TextChunk): TextChunk {
+function selected(chunk: TextChunk, selectedBg: RGBA): TextChunk {
   return {
     ...chunk,
-    bg: RGBA.fromIndex(palette.selectedBg),
+    bg: selectedBg,
   };
+}
+
+function sessionBlock(
+  chunks: TextChunk[],
+  isSelected: boolean,
+  selectedBg: RGBA,
+  width: number | undefined,
+): TextChunk[] {
+  const result: TextChunk[] = [];
+  let lineLength = 0;
+
+  startLine();
+
+  chunks.forEach((chunk) => {
+    const lines = chunk.text.split("\n");
+
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        endLine();
+        result.push(
+          isSelected ? selected({ ...chunk, text: "\n" }, selectedBg) : { ...chunk, text: "\n" },
+        );
+        startLine();
+      }
+
+      if (line) {
+        result.push(
+          isSelected ? selected({ ...chunk, text: line }, selectedBg) : { ...chunk, text: line },
+        );
+        lineLength += line.length;
+      }
+    });
+  });
+
+  endLine();
+
+  return result;
+
+  function startLine(): void {
+    result.push(sessionBorder(isSelected, selectedBg));
+    lineLength = 2;
+  }
+
+  function endLine(): void {
+    if (!isSelected || width === undefined || lineLength >= width) {
+      return;
+    }
+
+    result.push(selected(textChunk(" ".repeat(width - lineLength)), selectedBg));
+  }
+}
+
+function sessionBorder(isSelected: boolean, selectedBg: RGBA): TextChunk {
+  const chunk = {
+    __isChunk: true,
+    text: isSelected ? "▎ " : "  ",
+    attributes: 0,
+    ...(isSelected ? { fg: RGBA.fromIndex(palette.brightCyan) } : {}),
+  } satisfies TextChunk;
+
+  return isSelected ? selected(chunk, selectedBg) : chunk;
 }
 
 function muted(text: string): TextChunk {
