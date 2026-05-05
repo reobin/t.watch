@@ -176,6 +176,202 @@ describe("listSessions", () => {
     ]);
   });
 
+  test("adds path and git metadata from the active pane", async () => {
+    const calls = mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            ["$1", "@1", "%1", "1", "1", "bash", "10", "shell", "", "", "", "", "/repo/work"].join(
+              "\x1f",
+            ),
+            ["$1", "@1", "%2", "2", "0", "bash", "20", "shell", "", "", "", "", "/repo/other"].join(
+              "\x1f",
+            ),
+          ].join("\n"),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "100 10 bash -bash\n200 20 bash -bash" },
+        { exitCode: 0, stdout: "main\n" },
+        { exitCode: 0, stdout: " M src/index.ts\n" },
+      ],
+    });
+
+    const result = await listSessions();
+
+    expect(result).toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          name: "work",
+          path: "/repo/work",
+          gitBranch: "main",
+          gitDirty: true,
+          windows: [
+            {
+              panes: [
+                { id: "%1", currentPath: "/repo/work" },
+                { id: "%2", currentPath: "/repo/other" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(calls.slice(5)).toEqual([
+      ["git", "-C", "/repo/work", "symbolic-ref", "--quiet", "--short", "HEAD"],
+      ["git", "-C", "/repo/work", "status", "--porcelain"],
+    ]);
+  });
+
+  test("falls back to the first pane path when the active pane has none", async () => {
+    const calls = mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            ["$1", "@1", "%1", "1", "0", "bash", "10", "shell", "", "", "", "", "/repo/first"].join(
+              "\x1f",
+            ),
+            ["$1", "@1", "%2", "2", "1", "bash", "20", "shell", "", "", "", "", ""].join("\x1f"),
+          ].join("\n"),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "100 10 bash -bash\n200 20 bash -bash" },
+        { exitCode: 0, stdout: "main\n" },
+        { exitCode: 0, stdout: "" },
+      ],
+    });
+
+    const result = await listSessions();
+
+    expect(result).toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          path: "/repo/first",
+          gitBranch: "main",
+        },
+      ],
+    });
+    if (result.ok) {
+      expect(result.sessions[0]?.gitDirty).toBeUndefined();
+    }
+    expect(calls.slice(5)).toEqual([
+      ["git", "-C", "/repo/first", "symbolic-ref", "--quiet", "--short", "HEAD"],
+      ["git", "-C", "/repo/first", "status", "--porcelain"],
+    ]);
+  });
+
+  test("uses the short commit when the git path is detached", async () => {
+    const calls = mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            "$1",
+            "@1",
+            "%1",
+            "1",
+            "1",
+            "bash",
+            "10",
+            "shell",
+            "",
+            "",
+            "",
+            "",
+            "/repo/work",
+          ].join("\x1f"),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "100 10 bash -bash" },
+        { exitCode: 1, stdout: "" },
+        { exitCode: 0, stdout: "abc1234\n" },
+        { exitCode: 0, stdout: "" },
+      ],
+    });
+
+    const result = await listSessions();
+
+    expect(result).toMatchObject({
+      ok: true,
+      sessions: [{ path: "/repo/work", gitBranch: "abc1234" }],
+    });
+    if (result.ok) {
+      expect(result.sessions[0]?.gitDirty).toBeUndefined();
+    }
+    expect(calls.slice(5)).toEqual([
+      ["git", "-C", "/repo/work", "symbolic-ref", "--quiet", "--short", "HEAD"],
+      ["git", "-C", "/repo/work", "rev-parse", "--short", "HEAD"],
+      ["git", "-C", "/repo/work", "status", "--porcelain"],
+    ]);
+  });
+
+  test("keeps the path without git metadata outside a git repo", async () => {
+    const calls = mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "%1", "1", "1", "bash", "10", "shell", "", "", "", "", "/tmp"].join(
+            "\x1f",
+          ),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "100 10 bash -bash" },
+        { exitCode: 1, stdout: "" },
+        { exitCode: 1, stdout: "" },
+      ],
+    });
+
+    const result = await listSessions();
+
+    expect(result).toMatchObject({
+      ok: true,
+      sessions: [{ path: "/tmp" }],
+    });
+    if (result.ok) {
+      expect(result.sessions[0]?.gitBranch).toBeUndefined();
+      expect(result.sessions[0]?.gitDirty).toBeUndefined();
+    }
+    expect(calls.slice(5)).toEqual([
+      ["git", "-C", "/tmp", "symbolic-ref", "--quiet", "--short", "HEAD"],
+      ["git", "-C", "/tmp", "rev-parse", "--short", "HEAD"],
+    ]);
+  });
+
   test("detects sessions attached through ssh", async () => {
     mockTmux({
       results: [

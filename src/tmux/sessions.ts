@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, normalize, resolve as resolvePath } from "node:path";
 import { missingTmuxMessage, runTmux } from "./commands";
+import { gitMetadata } from "./git";
 import type {
   TmuxPane,
   TmuxPaneIntegrationStatus,
@@ -80,13 +81,15 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
       const panesByWindow = groupPanesByWindow(panes, processTree, processesByPid);
       const windowsBySession = groupWindowsBySession(windows, panesByWindow);
 
+      const sessions = result.stdout
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => parseSession(line, windowsBySession, sshAttachedSessions));
+
       return {
         ok: true,
-        sessions: result.stdout
-          .trim()
-          .split(/\r?\n/)
-          .filter(Boolean)
-          .map((line) => parseSession(line, windowsBySession, sshAttachedSessions)),
+        sessions: await withSessionMetadata(sessions),
       };
     }
 
@@ -360,6 +363,7 @@ function groupPanesByWindow(
       active: pane.active,
       command: pane.command,
       title: pane.title,
+      ...(pane.currentPath ? { currentPath: pane.currentPath } : {}),
       processName,
       ssh: isSshPane(pane, processTree),
       ...(integration ? { integration } : {}),
@@ -397,6 +401,35 @@ function groupWindowsBySession(
   }
 
   return windowsBySession;
+}
+
+async function withSessionMetadata(sessions: TmuxSession[]): Promise<TmuxSession[]> {
+  return Promise.all(
+    sessions.map(async (session) => {
+      const path = sessionPath(session);
+
+      if (!path) {
+        return session;
+      }
+
+      const git = await gitMetadata(path);
+
+      return {
+        ...session,
+        path,
+        ...(git.branch ? { gitBranch: git.branch } : {}),
+        ...(git.dirty ? { gitDirty: true } : {}),
+      };
+    }),
+  );
+}
+
+function sessionPath(session: TmuxSession): string | undefined {
+  const activeWindow = session.windows.find((window) => window.active);
+  const activePane = activeWindow?.panes.find((pane) => pane.active);
+  const firstPane = session.windows.flatMap((window) => window.panes)[0];
+
+  return activePane?.currentPath || firstPane?.currentPath || undefined;
 }
 
 function isSshPane(pane: PaneRecord, processTree: Map<number, ProcessInfo[]>): boolean {
