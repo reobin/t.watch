@@ -4,6 +4,7 @@ import {
   firstPaneId,
   firstSessionId,
   hasSession,
+  isAttachedActivePane,
   selectNextSession,
   selectPreviousSession,
 } from "./navigation";
@@ -75,9 +76,35 @@ describe("session navigation", () => {
     expect(firstPaneId(session("$1", { paneIds: [] }))).toBeUndefined();
     expect(firstPaneId(undefined)).toBeUndefined();
   });
+
+  test("checks if a pane is active in the attached session", () => {
+    const sessions = [session("$1", { attached: true, activePaneId: "%1" })];
+
+    expect(isAttachedActivePane(sessions, "%1")).toBe(true);
+    expect(isAttachedActivePane(sessions, "%2")).toBe(false);
+    expect(isAttachedActivePane(sessions, undefined)).toBe(false);
+  });
+
+  test("does not treat active panes in detached or inactive windows as attached active", () => {
+    expect(isAttachedActivePane([session("$1", { activePaneId: "%1" })], "%1")).toBe(false);
+    expect(
+      isAttachedActivePane(
+        [session("$1", { attached: true, activePaneId: "%1", windowActive: false })],
+        "%1",
+      ),
+    ).toBe(false);
+  });
 });
 
-function session(id: string, input: { attached?: boolean; paneIds?: string[] } = {}): TmuxSession {
+function session(
+  id: string,
+  input: {
+    activePaneId?: string;
+    attached?: boolean;
+    paneIds?: string[];
+    windowActive?: boolean;
+  } = {},
+): TmuxSession {
   return {
     id,
     name: id,
@@ -86,8 +113,8 @@ function session(id: string, input: { attached?: boolean; paneIds?: string[] } =
         id: "@1",
         index: 1,
         name: "work",
-        active: true,
-        panes: (input.paneIds ?? ["%1"]).map(pane),
+        active: input.windowActive ?? true,
+        panes: (input.paneIds ?? ["%1"]).map((id) => pane(id, id === input.activePaneId)),
       },
     ],
     attached: input.attached ?? false,
@@ -97,11 +124,11 @@ function session(id: string, input: { attached?: boolean; paneIds?: string[] } =
   };
 }
 
-function pane(id: string): TmuxSession["windows"][number]["panes"][number] {
+function pane(id: string, active = false): TmuxSession["windows"][number]["panes"][number] {
   return {
     id,
     index: Number(id.slice(1)),
-    active: false,
+    active,
     command: "bash",
     title: "bash",
     processName: "bash",
