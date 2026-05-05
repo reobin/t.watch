@@ -46,7 +46,7 @@ export function createScreen(
   const footer = new TextRenderable(renderer, {
     id: "shortcut-footer",
     content: new StyledText([
-      fg(terminalFg)("j/k ↑/↓"),
+      fg(terminalFg)("j/k"),
       fg(textMutedFg)(" select  "),
       fg(terminalFg)("↵"),
       fg(textMutedFg)(" focus  "),
