@@ -43,9 +43,9 @@ export function createScreen(renderer: CliRenderer, initialContent: ScreenConten
     content: new StyledText([
       { __isChunk: true, text: "j/k", attributes: 0 },
       dim(fg(muted)(" select  ")),
-      { __isChunk: true, text: "enter", attributes: 0 },
+      { __isChunk: true, text: "↵", attributes: 0 },
       dim(fg(muted)(" focus  ")),
-      { __isChunk: true, text: "ctrl+c", attributes: 0 },
+      { __isChunk: true, text: "^C", attributes: 0 },
       dim(fg(muted)(" exit")),
     ]),
     width: "100%",
