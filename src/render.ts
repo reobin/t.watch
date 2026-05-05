@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { RGBA, StyledText, bold, dim, fg, type TextChunk } from "@opentui/core";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
@@ -46,7 +47,10 @@ function renderSession(
 ): TextChunk[] {
   const marker = session.attached ? "●" : "○";
   const header = `${marker} ${session.name}${session.sshAttached ? " <ssh>" : ""}`;
-  const chunks: TextChunk[] = [renderSessionHeader(header, session)];
+  const chunks: TextChunk[] = [
+    renderSessionHeader(header, session),
+    ...renderSessionMetadata(session),
+  ];
 
   session.windows.forEach((window) => {
     window.panes.forEach((pane, paneIndex) => {
@@ -67,6 +71,32 @@ function renderSession(
   });
 
   return chunks;
+}
+
+function renderSessionMetadata(session: TmuxSession): TextChunk[] {
+  const lines = [session.path ? formatPath(session.path) : undefined, formatBranch(session)].filter(
+    (line): line is string => Boolean(line),
+  );
+
+  return lines.map((line) => muted(`\n  · ${line}`));
+}
+
+function formatPath(path: string): string {
+  const home = homedir();
+
+  if (path === home) {
+    return "~";
+  }
+
+  if (path.startsWith(`${home}/`)) {
+    return `~/${path.slice(home.length + 1)}`;
+  }
+
+  return path;
+}
+
+function formatBranch(session: TmuxSession): string | undefined {
+  return session.gitBranch ? `${session.gitBranch}${session.gitDirty ? "*" : ""}` : undefined;
 }
 
 function renderSessionHeader(header: string, session: TmuxSession): TextChunk {

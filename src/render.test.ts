@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import { createTextAttributes } from "@opentui/core";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
@@ -20,6 +21,9 @@ describe("render", () => {
     const sessions: TmuxSession[] = [
       session({
         name: "work",
+        path: "/repo/work",
+        gitBranch: "main",
+        gitDirty: true,
         attached: true,
         windows: [
           window({
@@ -57,6 +61,8 @@ describe("render", () => {
         "thud.sh",
         "",
         "● work",
+        "  · /repo/work",
+        "  · main*",
         "  ╭─ opencode ● working",
         "  ╰─ bash",
         "  ╶─ bun",
@@ -84,11 +90,31 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "● work")?.fg?.slot).toBe(6);
+    expect(output.chunks.find((chunk) => chunk.text === "\n  · /repo/work")?.attributes).toBe(
+      createTextAttributes({ dim: true }),
+    );
+    expect(output.chunks.find((chunk) => chunk.text === "\n  · main*")?.fg?.slot).toBe(8);
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("pane");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("active");
+  });
+
+  test("formats home paths and clean git branches", () => {
+    const output = renderSessions([
+      session({
+        name: "session",
+        path: `${homedir()}/dev/thud.sh`,
+        gitBranch: "main",
+        gitDirty: false,
+        windows: [window({ panes: [pane({ processName: "bash" })] })],
+      }),
+    ]);
+
+    expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
+      ["thud.sh", "", "○ session", "  · ~/dev/thud.sh", "  · main", "  ╶─ bash"].join("\n"),
+    );
   });
 
   test("renders integration status markers", () => {

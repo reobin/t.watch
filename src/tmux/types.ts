@@ -11,6 +11,9 @@ export type TmuxCheckResult =
 export type TmuxSession = {
   id: string;
   name: string;
+  path?: string;
+  gitBranch?: string;
+  gitDirty?: boolean;
   windows: TmuxWindow[];
   attached: boolean;
   sshAttached: boolean;
@@ -32,6 +35,7 @@ export type TmuxPane = {
   active: boolean;
   command: string;
   title: string;
+  currentPath?: string;
   processName: string;
   ssh: boolean;
   integration?: TmuxPaneIntegration;
