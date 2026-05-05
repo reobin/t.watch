@@ -260,7 +260,7 @@ describe("listSessions", () => {
         {
           exitCode: 0,
           stdout: [
-            ["$1", "@1", "%1", "1", "1", "bash", "40", "shell"].join("\x1f"),
+            ["$1", "@1", "%1", "1", "1", "ssh", "40", "shell"].join("\x1f"),
             ["$1", "@1", "%2", "2", "0", "bash", "60", "shell"].join("\x1f"),
           ].join("\n"),
         },
@@ -384,6 +384,48 @@ describe("listSessions", () => {
                     tool: "opencode",
                     status: "unknown",
                   },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("uses the tmux foreground command as the pane name", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
+        },
+        {
+          exitCode: 0,
+          stdout: ["$1", "@1", "%1", "1", "1", "npm", "40", "shell"].join("\x1f"),
+        },
+        { exitCode: 0, stdout: "" },
+        {
+          exitCode: 0,
+          stdout: ["50 40 sh sh -c vite", "60 50 node node /app/node_modules/.bin/vite"].join("\n"),
+        },
+      ],
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "npm",
+                  processName: "npm",
                 },
               ],
             },

@@ -341,7 +341,7 @@ function groupPanesByWindow(
   for (const pane of panes) {
     const key = paneKey(pane.sessionId, pane.windowId);
     const windowPanes = panesByWindow.get(key) ?? [];
-    const processName = resolvePaneProcessName(pane, processTree);
+    const processName = resolvePaneProcessName(pane);
     const integration = pane.integration?.tool === processName ? pane.integration : undefined;
 
     windowPanes.push({
@@ -399,23 +399,12 @@ function isSshPane(pane: PaneRecord, processTree: Map<number, ProcessInfo[]>): b
   );
 }
 
-function resolvePaneProcessName(pane: PaneRecord, processTree: Map<number, ProcessInfo[]>): string {
+function resolvePaneProcessName(pane: PaneRecord): string {
   if (pane.title.startsWith("OC |")) {
     return "opencode";
   }
 
-  if (isEditorCommand(pane.command)) {
-    return prettifyProcessName(pane.command);
-  }
-
-  const descendants = listDescendants(pane.pid, processTree);
-  const processInfo = descendants.at(-1);
-
-  if (!processInfo) {
-    return prettifyProcessName(pane.command);
-  }
-
-  return prettifyProcessInfo(processInfo);
+  return prettifyProcessName(pane.command);
 }
 
 function listDescendants(pid: number, processTree: Map<number, ProcessInfo[]>): ProcessInfo[] {
@@ -436,28 +425,6 @@ function listDescendants(pid: number, processTree: Map<number, ProcessInfo[]>): 
   return descendants.filter((processInfo) => processInfo.command !== "ps");
 }
 
-function prettifyProcessInfo(processInfo: ProcessInfo): string {
-  if (isRuntimeCommand(processInfo.command)) {
-    return prettifyProcessName(runtimeScriptName(processInfo.args) ?? processInfo.command);
-  }
-
-  return prettifyProcessName(processInfo.command);
-}
-
-function runtimeScriptName(args: string): string | undefined {
-  const parts = args.split(/\s+/).filter(Boolean);
-
-  for (const part of parts.slice(1)) {
-    if (part.startsWith("-")) {
-      continue;
-    }
-
-    return basename(part);
-  }
-
-  return undefined;
-}
-
 function prettifyProcessName(name: string): string {
   const base = basename(name).replace(/^\./, "");
 
@@ -470,14 +437,6 @@ function prettifyProcessName(name: string): string {
 
 function basename(path: string): string {
   return path.split("/").filter(Boolean).at(-1) ?? path;
-}
-
-function isRuntimeCommand(command: string): boolean {
-  return ["node", "bun", "python", "python3", "ruby", "perl", "deno"].includes(basename(command));
-}
-
-function isEditorCommand(command: string): boolean {
-  return ["nvim", "vim"].includes(basename(command));
 }
 
 function paneKey(sessionId: string, windowId: string): string {
