@@ -79,6 +79,12 @@ export async function startApp(): Promise<void> {
       return;
     }
 
+    if ((key.shift && key.name === "j") || key.name === "J") {
+      key.preventDefault();
+      void jumpToPane();
+      return;
+    }
+
     if (key.name === "j" || key.name === "down") {
       key.preventDefault();
       selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
@@ -90,12 +96,6 @@ export async function startApp(): Promise<void> {
       key.preventDefault();
       selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentSessions();
-      return;
-    }
-
-    if (key.name === "J") {
-      key.preventDefault();
-      void jumpToPane();
       return;
     }
 
