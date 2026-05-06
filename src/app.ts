@@ -8,12 +8,7 @@ import {
   type TmuxSessionWatcher,
 } from "./tmux";
 import { renderCommandPanel, type CommandPanelItem } from "./command-panel";
-import {
-  renderLoading,
-  renderMessage,
-  renderNoSessions,
-  renderSessions,
-} from "./render";
+import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import { createScreen } from "./screen";
 import { detectRenderTheme } from "./theme";
 import {
@@ -69,7 +64,11 @@ export async function startApp(): Promise<void> {
   terminalWidth = renderer.width;
   const commands: (CommandPanelItem & { run: () => void | Promise<void> })[] = [
     {
-      label: "Jump to next pane *",
+      label: "Focus session",
+      run: focusSelectedSession,
+    },
+    {
+      label: "Jump pane",
       run: jumpToPane,
     },
     {
@@ -122,8 +121,7 @@ export async function startApp(): Promise<void> {
 
       if (key.name === "k" || key.name === "up") {
         key.preventDefault();
-        selectedCommandIndex =
-          (selectedCommandIndex - 1 + commands.length) % commands.length;
+        selectedCommandIndex = (selectedCommandIndex - 1 + commands.length) % commands.length;
         renderCommandPanelView();
         return;
       }
@@ -155,22 +153,14 @@ export async function startApp(): Promise<void> {
 
     if (key.name === "j" || key.name === "down") {
       key.preventDefault();
-      selectedSessionId = selectNextSession(
-        sessions,
-        selectedSessionId,
-        currentSessionId,
-      );
+      selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentView();
       return;
     }
 
     if (key.name === "k" || key.name === "up") {
       key.preventDefault();
-      selectedSessionId = selectPreviousSession(
-        sessions,
-        selectedSessionId,
-        currentSessionId,
-      );
+      selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentView();
       return;
     }
@@ -251,8 +241,7 @@ export async function startApp(): Promise<void> {
     sessions = result.sessions;
     const nextCurrentSessionId =
       findCurrentSessionId(sessions, undefined) ?? firstSessionId(sessions);
-    const appPaneLostTmuxFocus =
-      Boolean(appPaneId) && !isAttachedActivePane(sessions, appPaneId);
+    const appPaneLostTmuxFocus = Boolean(appPaneId) && !isAttachedActivePane(sessions, appPaneId);
 
     if (
       currentSessionId !== nextCurrentSessionId ||
@@ -313,14 +302,7 @@ export async function startApp(): Promise<void> {
   }
 
   function commandPanelWidth(width: number): number {
-    return Math.max(
-      1,
-      Math.min(
-        commandPanelMaxWidth,
-        width - commandPanelHorizontalMargin,
-        width,
-      ),
-    );
+    return Math.max(1, Math.min(commandPanelMaxWidth, width - commandPanelHorizontalMargin, width));
   }
 
   function resetSelectedSessionToCurrent(): void {
@@ -342,9 +324,7 @@ export async function startApp(): Promise<void> {
       return;
     }
 
-    const paneId = firstPaneId(
-      sessions.find((session) => session.id === selectedSessionId),
-    );
+    const paneId = firstPaneId(sessions.find((session) => session.id === selectedSessionId));
 
     if (!paneId) {
       return;
