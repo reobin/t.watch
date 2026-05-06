@@ -49,7 +49,7 @@ describe("runCli", () => {
     await expect(runCli(["bun", "thud", "help"], startApp, output)).resolves.toBe(1);
     expect(startApp).not.toHaveBeenCalled();
     expect(output.log).not.toHaveBeenCalled();
-    expect(output.error).toHaveBeenCalledWith("Usage: thud [version|attention]");
+    expect(output.error).toHaveBeenCalledWith("Usage: thud [version|jump]");
   });
 
   test("rejects extra args", async () => {
@@ -59,10 +59,10 @@ describe("runCli", () => {
     await expect(runCli(["bun", "thud", "version", "extra"], startApp, output)).resolves.toBe(1);
     expect(startApp).not.toHaveBeenCalled();
     expect(output.log).not.toHaveBeenCalled();
-    expect(output.error).toHaveBeenCalledWith("Usage: thud [version|attention]");
+    expect(output.error).toHaveBeenCalledWith("Usage: thud [version|jump]");
   });
 
-  test("focuses the next attention pane", async () => {
+  test("jumps to the next matching pane", async () => {
     const startApp = mock(async () => {});
     const output = mockOutput();
     const listSessions = mock(async () => ({
@@ -79,7 +79,7 @@ describe("runCli", () => {
     const focusPaneForAllClients = mock(async () => ({ ok: true as const }));
 
     await expect(
-      runCli(["bun", "thud", "attention"], startApp, output, {
+      runCli(["bun", "thud", "jump"], startApp, output, {
         focusPaneForAllClients,
         listSessions,
       }),
@@ -90,7 +90,7 @@ describe("runCli", () => {
     expect(output.error).not.toHaveBeenCalled();
   });
 
-  test("focuses relative to the pane where the attention command was invoked", async () => {
+  test("jumps relative to the pane where the jump command was invoked", async () => {
     process.env.TMUX_PANE = "%4";
     const startApp = mock(async () => {});
     const output = mockOutput();
@@ -114,7 +114,7 @@ describe("runCli", () => {
     const focusPaneForAllClients = mock(async () => ({ ok: true as const }));
 
     await expect(
-      runCli(["bun", "thud", "attention"], startApp, output, {
+      runCli(["bun", "thud", "jump"], startApp, output, {
         focusPaneForAllClients,
         listSessions,
       }),
@@ -123,7 +123,7 @@ describe("runCli", () => {
     expect(output.error).not.toHaveBeenCalled();
   });
 
-  test("does nothing when there is no attention pane", async () => {
+  test("does nothing when there is no jump pane", async () => {
     const startApp = mock(async () => {});
     const output = mockOutput();
     const listSessions = mock(async () => ({
@@ -133,7 +133,7 @@ describe("runCli", () => {
     const focusPaneForAllClients = mock(async () => ({ ok: true as const }));
 
     await expect(
-      runCli(["bun", "thud", "attention"], startApp, output, {
+      runCli(["bun", "thud", "jump"], startApp, output, {
         focusPaneForAllClients,
         listSessions,
       }),
@@ -142,14 +142,14 @@ describe("runCli", () => {
     expect(output.error).not.toHaveBeenCalled();
   });
 
-  test("reports attention session listing failures", async () => {
+  test("reports jump session listing failures", async () => {
     const startApp = mock(async () => {});
     const output = mockOutput();
     const listSessions = mock(async () => ({ ok: false as const, message: "tmux failed" }));
     const focusPaneForAllClients = mock(async () => ({ ok: true as const }));
 
     await expect(
-      runCli(["bun", "thud", "attention"], startApp, output, {
+      runCli(["bun", "thud", "jump"], startApp, output, {
         focusPaneForAllClients,
         listSessions,
       }),
@@ -158,7 +158,7 @@ describe("runCli", () => {
     expect(output.error).toHaveBeenCalledWith("tmux failed");
   });
 
-  test("reports attention focus failures", async () => {
+  test("reports jump focus failures", async () => {
     const startApp = mock(async () => {});
     const output = mockOutput();
     const listSessions = mock(async () => ({
@@ -178,7 +178,7 @@ describe("runCli", () => {
     }));
 
     await expect(
-      runCli(["bun", "thud", "attention"], startApp, output, {
+      runCli(["bun", "thud", "jump"], startApp, output, {
         focusPaneForAllClients,
         listSessions,
       }),

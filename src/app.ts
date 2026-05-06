@@ -16,7 +16,7 @@ import {
   firstSessionId,
   hasSession,
   isAttachedActivePane,
-  nextAttentionPaneId,
+  nextJumpPaneId,
   selectNextSession,
   selectPreviousSession,
 } from "./navigation";
@@ -93,9 +93,9 @@ export async function startApp(): Promise<void> {
       return;
     }
 
-    if (key.name === "a") {
+    if (key.name === "J") {
       key.preventDefault();
-      void focusAttentionPane();
+      void jumpToPane();
       return;
     }
 
@@ -237,8 +237,8 @@ export async function startApp(): Promise<void> {
     await focusPane(paneId);
   }
 
-  async function focusAttentionPane(): Promise<void> {
-    const paneId = nextAttentionPaneId(sessions, appPaneId);
+  async function jumpToPane(): Promise<void> {
+    const paneId = nextJumpPaneId(sessions, appPaneId);
 
     if (!paneId) {
       return;

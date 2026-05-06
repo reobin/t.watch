@@ -1,6 +1,6 @@
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
-const attentionStatusPriority = [
+const jumpStatusPriority = [
   "requesting",
   "idle",
   "working",
@@ -53,7 +53,7 @@ export function firstPaneId(session: TmuxSession | undefined): string | undefine
   return session?.windows[0]?.panes[0]?.id;
 }
 
-export function nextAttentionPaneId(
+export function nextJumpPaneId(
   sessions: TmuxSession[],
   currentPaneId?: string,
 ): string | undefined {
@@ -70,7 +70,7 @@ export function nextAttentionPaneId(
     ? panes.findIndex((pane) => pane.id === resolvedCurrentPaneId)
     : -1;
 
-  for (const status of attentionStatusPriority) {
+  for (const status of jumpStatusPriority) {
     const pane = orderedAfterCurrent(panes, currentIndex).find(
       (pane) => pane.integration?.status === status,
     );

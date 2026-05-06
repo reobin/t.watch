@@ -1,4 +1,4 @@
-import { nextAttentionPaneId } from "./navigation";
+import { nextJumpPaneId } from "./navigation";
 import { focusPaneForAllClients, listSessions } from "./tmux";
 
 type Output = {
@@ -12,7 +12,7 @@ type TmuxActions = {
   listSessions: typeof listSessions;
 };
 
-const usage = "Usage: thud [version|attention]";
+const usage = "Usage: thud [version|jump]";
 const tmuxActions: TmuxActions = {
   focusPaneForAllClients,
   listSessions,
@@ -36,15 +36,15 @@ export async function runCli(
     return 0;
   }
 
-  if (args.length === 1 && args[0] === "attention") {
-    return focusAttentionPane(output, tmux);
+  if (args.length === 1 && args[0] === "jump") {
+    return jumpToPane(output, tmux);
   }
 
   output.error(usage);
   return 1;
 }
 
-async function focusAttentionPane(output: Output, tmux: TmuxActions): Promise<number> {
+async function jumpToPane(output: Output, tmux: TmuxActions): Promise<number> {
   const result = await tmux.listSessions();
 
   if (result.ok === false) {
@@ -52,7 +52,7 @@ async function focusAttentionPane(output: Output, tmux: TmuxActions): Promise<nu
     return 1;
   }
 
-  const paneId = nextAttentionPaneId(result.sessions, process.env.TMUX_PANE);
+  const paneId = nextJumpPaneId(result.sessions, process.env.TMUX_PANE);
 
   if (!paneId) {
     return 0;

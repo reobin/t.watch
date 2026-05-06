@@ -5,7 +5,7 @@ import {
   firstSessionId,
   hasSession,
   isAttachedActivePane,
-  nextAttentionPaneId,
+  nextJumpPaneId,
   selectNextSession,
   selectPreviousSession,
 } from "./navigation";
@@ -106,12 +106,12 @@ describe("session navigation", () => {
       }),
     ];
 
-    expect(nextAttentionPaneId(sessions)).toBe("%3");
+    expect(nextJumpPaneId(sessions)).toBe("%3");
   });
 
   test("falls back to idle then working panes", () => {
     expect(
-      nextAttentionPaneId([
+      nextJumpPaneId([
         session("$1", {
           activePaneId: "%1",
           attached: true,
@@ -122,7 +122,7 @@ describe("session navigation", () => {
     ).toBe("%3");
 
     expect(
-      nextAttentionPaneId([
+      nextJumpPaneId([
         session("$1", {
           activePaneId: "%1",
           attached: true,
@@ -133,7 +133,7 @@ describe("session navigation", () => {
     ).toBe("%2");
   });
 
-  test("wraps when finding an attention pane", () => {
+  test("wraps when finding a jump pane", () => {
     const sessions = [
       session("$1", {
         activePaneId: "%3",
@@ -143,10 +143,10 @@ describe("session navigation", () => {
       }),
     ];
 
-    expect(nextAttentionPaneId(sessions)).toBe("%1");
+    expect(nextJumpPaneId(sessions)).toBe("%1");
   });
 
-  test("skips the current pane when finding attention panes", () => {
+  test("skips the current pane when finding jump panes", () => {
     const sessions = [
       session("$1", {
         activePaneId: "%1",
@@ -156,7 +156,7 @@ describe("session navigation", () => {
       }),
     ];
 
-    expect(nextAttentionPaneId(sessions)).toBe("%2");
+    expect(nextJumpPaneId(sessions)).toBe("%2");
   });
 
   test("uses an explicit current pane before falling back to the first attached active pane", () => {
@@ -175,12 +175,12 @@ describe("session navigation", () => {
       }),
     ];
 
-    expect(nextAttentionPaneId(sessions, "%4")).toBe("%5");
+    expect(nextJumpPaneId(sessions, "%4")).toBe("%5");
   });
 
-  test("returns undefined without an attention pane", () => {
+  test("returns undefined without a jump pane", () => {
     expect(
-      nextAttentionPaneId([
+      nextJumpPaneId([
         session("$1", {
           activePaneId: "%1",
           attached: true,
