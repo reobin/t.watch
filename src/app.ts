@@ -7,7 +7,7 @@ import {
   type TmuxSession,
   type TmuxSessionWatcher,
 } from "./tmux";
-import { renderCommandPanel, type CommandPanelItem } from "./command-panel";
+import { renderCommandPanel, renderHelpPanel, type CommandPanelItem } from "./command-panel";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import { createScreen } from "./screen";
 import { detectRenderTheme } from "./theme";
@@ -31,6 +31,7 @@ const paletteTimeoutMs = 100;
 const enableTerminalFocusReporting = "\x1b[?1004h";
 const disableTerminalFocusReporting = "\x1b[?1004l";
 const commandPanelMaxWidth = 40;
+const helpPanelMaxWidth = 72;
 const commandPanelHorizontalMargin = 4;
 const commandPanelChromeWidth = 4;
 
@@ -46,7 +47,7 @@ export async function startApp(): Promise<void> {
   let paneNavigationOpen = false;
   let sessions: TmuxSession[] = [];
   let terminalWidth = 0;
-  let commandPanelOpen = false;
+  let activePanel: "commands" | "help" | undefined;
   let selectedCommandIndex = 0;
   const appPaneId = process.env.TMUX_PANE;
 
@@ -82,6 +83,10 @@ export async function startApp(): Promise<void> {
       run: refreshSessions,
     },
     {
+      label: "Help",
+      run: openHelpPanel,
+    },
+    {
       label: "Quit",
       run: () => renderer.destroy(),
     },
@@ -101,8 +106,17 @@ export async function startApp(): Promise<void> {
   renderer.keyInput.on("keypress", (key) => {
     if ((key.ctrl || key.meta) && key.name === "p") {
       key.preventDefault();
-      commandPanelOpen = !commandPanelOpen;
-      screen.setCommandPanelVisible(commandPanelOpen);
+      activePanel = activePanel === "commands" ? undefined : "commands";
+      selectedCommandIndex = Math.min(selectedCommandIndex, commands.length - 1);
+      screen.setCommandPanelVisible(activePanel !== undefined);
+      renderCurrentView();
+      return;
+    }
+
+    if (key.name === "?" || (key.shift && key.name === "/")) {
+      key.preventDefault();
+      activePanel = activePanel === "help" ? undefined : "help";
+      screen.setCommandPanelVisible(activePanel !== undefined);
       renderCurrentView();
       return;
     }
@@ -111,10 +125,25 @@ export async function startApp(): Promise<void> {
       return;
     }
 
-    if (commandPanelOpen) {
+    if (activePanel === "help") {
       if (key.name === "escape" || key.name === "esc") {
         key.preventDefault();
-        closeCommandPanel();
+        closeActivePanel();
+        return;
+      }
+
+      if (isHelpPassthroughKey(key)) {
+        closeActivePanel();
+      } else {
+        key.preventDefault();
+        return;
+      }
+    }
+
+    if (activePanel === "commands") {
+      if (key.name === "escape" || key.name === "esc") {
+        key.preventDefault();
+        closeActivePanel();
         return;
       }
 
@@ -136,7 +165,7 @@ export async function startApp(): Promise<void> {
         key.preventDefault();
         const command = commands[selectedCommandIndex];
 
-        closeCommandPanel();
+        closeActivePanel();
         void command?.run();
         return;
       }
@@ -308,8 +337,10 @@ export async function startApp(): Promise<void> {
   function renderCurrentView(): void {
     renderCurrentSessions();
 
-    if (commandPanelOpen) {
+    if (activePanel === "commands") {
       renderCommandPanelView();
+    } else if (activePanel === "help") {
+      renderHelpPanelView();
     }
   }
 
@@ -329,7 +360,7 @@ export async function startApp(): Promise<void> {
   }
 
   function renderCommandPanelView(): void {
-    const width = commandPanelWidth(terminalWidth);
+    const width = panelWidth(terminalWidth, commandPanelMaxWidth);
     const contentWidth = Math.max(1, width - commandPanelChromeWidth);
 
     screen.setCommandPanelWidth(width);
@@ -341,9 +372,38 @@ export async function startApp(): Promise<void> {
     );
   }
 
-  function closeCommandPanel(): void {
-    commandPanelOpen = false;
+  function renderHelpPanelView(): void {
+    const width = panelWidth(terminalWidth, helpPanelMaxWidth);
+    const contentWidth = Math.max(1, width - commandPanelChromeWidth);
+
+    screen.setCommandPanelWidth(width);
+    screen.setCommandPanel(renderHelpPanel({ ...renderTheme, width: contentWidth }));
+  }
+
+  function openHelpPanel(): void {
+    activePanel = "help";
+    screen.setCommandPanelVisible(true);
+    renderCurrentView();
+  }
+
+  function closeActivePanel(): void {
+    activePanel = undefined;
     screen.setCommandPanelVisible(false);
+  }
+
+  function isHelpPassthroughKey(key: { name: string; shift: boolean }): boolean {
+    return (
+      key.name === "q" ||
+      key.name === "tab" ||
+      key.name === "enter" ||
+      key.name === "return" ||
+      key.name === "j" ||
+      key.name === "k" ||
+      key.name === "down" ||
+      key.name === "up" ||
+      (key.shift && key.name === "j") ||
+      key.name === "J"
+    );
   }
 
   function closePaneNavigation(): void {
@@ -363,8 +423,8 @@ export async function startApp(): Promise<void> {
     renderCurrentView();
   }
 
-  function commandPanelWidth(width: number): number {
-    return Math.max(1, Math.min(commandPanelMaxWidth, width - commandPanelHorizontalMargin, width));
+  function panelWidth(width: number, maxWidth: number): number {
+    return Math.max(1, Math.min(maxWidth, width - commandPanelHorizontalMargin, width));
   }
 
   function resetSelectedSessionToCurrent(): void {
