@@ -21,6 +21,7 @@ export type Screen = {
   setCommandPanelVisible: (visible: boolean) => void;
   setCommandPanelWidth: (width: number) => void;
   setContent: (content: ScreenContent) => void;
+  setModeIndicator: (mode: string | undefined) => void;
 };
 
 export function createScreen(
@@ -30,6 +31,7 @@ export function createScreen(
 ): Screen {
   renderer.setBackgroundColor(terminalBg);
   const textMutedFg = theme.textMutedFg ?? muted;
+  let modeIndicator: string | undefined;
 
   const layout = new BoxRenderable(renderer, {
     id: "screen-layout",
@@ -57,10 +59,24 @@ export function createScreen(
     bg: "transparent",
   });
 
+  const statusLine = new TextRenderable(renderer, {
+    id: "status-line",
+    content: "",
+    width: "100%",
+    height: 0,
+    fg: terminalFg,
+    bg: "transparent",
+  });
+
+  updateStatusLine(renderer.width);
   updateFooter(renderer.width);
-  renderer.on("resize", updateFooter);
+  renderer.on("resize", (width) => {
+    updateStatusLine(width);
+    updateFooter(width);
+  });
 
   layout.add(view);
+  layout.add(statusLine);
   layout.add(footer);
   renderer.root.add(layout);
 
@@ -83,7 +99,18 @@ export function createScreen(
     setContent: (content) => {
       view.content = content;
     },
+    setModeIndicator: (mode) => {
+      modeIndicator = mode;
+      updateStatusLine(renderer.width);
+    },
   };
+
+  function updateStatusLine(width: number): void {
+    const content = renderStatusLine(textMutedFg, width, modeIndicator);
+
+    statusLine.content = content;
+    statusLine.height = modeIndicator ? lineCount(content) : 0;
+  }
 
   function updateFooter(width: number): void {
     const content = renderShortcutFooter(textMutedFg, width);
@@ -93,7 +120,19 @@ export function createScreen(
   }
 }
 
-function renderShortcutFooter(textMutedFg: RGBA, width: number): StyledText {
+export function renderStatusLine(
+  textMutedFg: RGBA,
+  width: number,
+  modeIndicator?: string,
+): StyledText {
+  const chunks = modeIndicator
+    ? fitLine([fg(terminalFg)("mode"), fg(textMutedFg)(` ${modeIndicator}`)], Math.max(1, width))
+    : [];
+
+  return new StyledText(chunks);
+}
+
+export function renderShortcutFooter(textMutedFg: RGBA, width: number): StyledText {
   const items = [
     [fg(terminalFg)("ctrl+p"), fg(textMutedFg)(" commands")],
     [fg(terminalFg)("?"), fg(textMutedFg)(" help")],

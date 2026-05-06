@@ -101,6 +101,7 @@ export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
       description: "Open commands",
       compactDescription: "commands",
     },
+    { shortcut: "m", description: "Cycle focus mode", compactDescription: "mode" },
     { shortcut: "?", description: "Show this help", compactDescription: "help" },
     { shortcut: "q", description: "Quit", compactDescription: "quit" },
   ];

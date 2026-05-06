@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { RGBA, createTextAttributes } from "@opentui/core";
 import { renderCommandPanel, renderHelpPanel } from "./command-panel";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
+import { renderShortcutFooter, renderStatusLine } from "./screen";
 import type { TmuxSession } from "./tmux";
 
 describe("render", () => {
@@ -65,6 +66,7 @@ describe("render", () => {
     expect(text).toContain("  tab           Select panes in the selected session");
     expect(text).toContain("  J             Jump to the next agent pane that needs attention");
     expect(text).toContain("  ctrl+p        Open commands");
+    expect(text).toContain("  m             Cycle focus mode");
     expect(text).toContain("  ?             Show this help");
     expect(text).toContain("esc close");
     expect(text.split("\n").every((line) => line.length <= 68)).toBe(true);
@@ -79,8 +81,27 @@ describe("render", () => {
     expect(text).toContain("  tab    select panes");
     expect(text).toContain("  J      needs attention");
     expect(text).toContain("  ^P     commands");
+    expect(text).toContain("  m      mode");
     expect(text).not.toContain("Select sessions, panes, or commands");
     expect(text.split("\n").every((line) => line.length <= 30)).toBe(true);
+  });
+
+  test("renders the shortcut footer", () => {
+    const output = renderShortcutFooter(RGBA.fromIndex(8), 80);
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("ctrl+p commands");
+    expect(text).toContain("? help");
+    expect(text).not.toContain("m mode");
+    expect(text.split("\n").every((line) => line.length <= 80)).toBe(true);
+  });
+
+  test("renders the mode status line", () => {
+    const output = renderStatusLine(RGBA.fromIndex(8), 80, "popup");
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toBe("mode popup");
+    expect(text.split("\n").every((line) => line.length <= 80)).toBe(true);
   });
 
   test("keeps compact help descriptions when very narrow", () => {
