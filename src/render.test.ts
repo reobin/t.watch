@@ -420,6 +420,52 @@ describe("render", () => {
     expect(paneChunk?.fg).toBeUndefined();
     expect(paneChunk?.bg?.slot).toBe(235);
   });
+
+  test("shows selected pane highlighting inside the selected session", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({ id: "%1", processName: "opencode", active: true }),
+                pane({ id: "%2", active: false }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { selectedPaneId: "%2" },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const selectedPaneMarker = output.chunks.find((chunk) => chunk.text === "▶─");
+    const selectedPaneChunk = output.chunks.find((chunk) => chunk.text === " bash");
+
+    expect(text).toContain("▎ ▶─ bash");
+    expect(selectedPaneMarker?.fg?.slot).toBe(14);
+    expect(selectedPaneMarker?.bg?.slot).toBe(235);
+    expect(selectedPaneChunk?.bg?.slot).toBe(235);
+  });
+
+  test("does not show selected pane highlighting outside the selected session", () => {
+    const output = renderSessions(
+      [
+        session({
+          id: "$1",
+          windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
+        }),
+        session({
+          id: "$2",
+          windows: [window({ panes: [pane({ id: "%2" })] })],
+        }),
+      ],
+      "$1",
+      { selectedPaneId: "%2" },
+    );
+
+    expect(output.chunks.some((chunk) => chunk.text === "▶─")).toBe(false);
+  });
 });
 
 function session(overrides: Partial<TmuxSession> = {}): TmuxSession {

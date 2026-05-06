@@ -16,9 +16,10 @@ thud
 thud jump
 ```
 
-Inside the HUD, press `j`/`k` or arrows to select sessions, `Enter` to focus the
-selected session, `J` to jump to the next matching pane, `Ctrl+P` to open the
-command panel, and `q` to quit.
+Inside the HUD, press `j`/`k` or arrows to select sessions, `Tab` to toggle pane
+navigation within the selected session, `Enter` to focus the selected session or
+pane, `Esc` to leave pane navigation, `J` to jump to the next matching pane,
+`Ctrl+P` to open the command panel, and `q` to quit.
 
 `thud jump` focuses the next pane with an integration status in this order:
 `requesting`, `idle`, then `working`. If nothing matches, it exits without

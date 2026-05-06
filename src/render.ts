@@ -17,6 +17,7 @@ const metadataPrefixWidth = 2;
 
 export type RenderTheme = {
   selectedBg?: RGBA;
+  selectedPaneId?: string;
   textMutedFg?: RGBA;
   width?: number;
 };
@@ -44,7 +45,14 @@ export function renderSessions(
   return new StyledText(
     sessions.flatMap((session, index) => [
       textChunk(index === 0 ? "" : "\n"),
-      ...renderSession(session, selectedSessionId, selectedBg, textMutedFg, theme.width),
+      ...renderSession(
+        session,
+        selectedSessionId,
+        theme.selectedPaneId,
+        selectedBg,
+        textMutedFg,
+        theme.width,
+      ),
     ]),
   );
 }
@@ -52,6 +60,7 @@ export function renderSessions(
 function renderSession(
   session: TmuxSession,
   selectedSessionId: string | undefined,
+  selectedPaneId: string | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
   width: number | undefined,
@@ -68,10 +77,11 @@ function renderSession(
 
   session.windows.forEach((window) => {
     window.panes.forEach((pane, paneIndex) => {
+      const isSelectedPane = isSelectedSession && pane.id === selectedPaneId;
       const branch = windowPaneBranch(window.panes.length, paneIndex);
       const rowChunks = [
         muted("\n", textMutedFg),
-        muted(branch, textMutedFg),
+        isSelectedPane ? terminalFg(palette.brightCyan, "▶─") : muted(branch, textMutedFg),
         ...renderPaneName(
           pane,
           session.attached && window.active && pane.active,
