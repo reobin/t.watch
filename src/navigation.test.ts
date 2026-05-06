@@ -5,10 +5,11 @@ import {
   firstSessionId,
   hasSession,
   isAttachedActivePane,
+  nextJumpPaneId,
   selectNextSession,
   selectPreviousSession,
 } from "./navigation";
-import type { TmuxSession } from "./tmux";
+import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 describe("session navigation", () => {
   test("selects the session after the current session when moving down with no selection", () => {
@@ -94,6 +95,101 @@ describe("session navigation", () => {
       ),
     ).toBe(false);
   });
+
+  test("finds the next requesting pane after the current pane", () => {
+    const sessions = [
+      session("$1", {
+        activePaneId: "%1",
+        attached: true,
+        paneStatuses: { "%2": "idle", "%3": "requesting" },
+        paneIds: ["%1", "%2", "%3"],
+      }),
+    ];
+
+    expect(nextJumpPaneId(sessions)).toBe("%3");
+  });
+
+  test("falls back to idle then working panes", () => {
+    expect(
+      nextJumpPaneId([
+        session("$1", {
+          activePaneId: "%1",
+          attached: true,
+          paneStatuses: { "%2": "working", "%3": "idle" },
+          paneIds: ["%1", "%2", "%3"],
+        }),
+      ]),
+    ).toBe("%3");
+
+    expect(
+      nextJumpPaneId([
+        session("$1", {
+          activePaneId: "%1",
+          attached: true,
+          paneStatuses: { "%2": "working" },
+          paneIds: ["%1", "%2"],
+        }),
+      ]),
+    ).toBe("%2");
+  });
+
+  test("wraps when finding a jump pane", () => {
+    const sessions = [
+      session("$1", {
+        activePaneId: "%3",
+        attached: true,
+        paneStatuses: { "%1": "requesting" },
+        paneIds: ["%1", "%2", "%3"],
+      }),
+    ];
+
+    expect(nextJumpPaneId(sessions)).toBe("%1");
+  });
+
+  test("skips the current pane when finding jump panes", () => {
+    const sessions = [
+      session("$1", {
+        activePaneId: "%1",
+        attached: true,
+        paneStatuses: { "%1": "requesting", "%2": "idle" },
+        paneIds: ["%1", "%2"],
+      }),
+    ];
+
+    expect(nextJumpPaneId(sessions)).toBe("%2");
+  });
+
+  test("uses an explicit current pane before falling back to the first attached active pane", () => {
+    const sessions = [
+      session("$1", {
+        activePaneId: "%1",
+        attached: true,
+        paneStatuses: { "%2": "requesting" },
+        paneIds: ["%1", "%2"],
+      }),
+      session("$2", {
+        activePaneId: "%4",
+        attached: true,
+        paneStatuses: { "%5": "requesting" },
+        paneIds: ["%3", "%4", "%5"],
+      }),
+    ];
+
+    expect(nextJumpPaneId(sessions, "%4")).toBe("%5");
+  });
+
+  test("returns undefined without a jump pane", () => {
+    expect(
+      nextJumpPaneId([
+        session("$1", {
+          activePaneId: "%1",
+          attached: true,
+          paneStatuses: { "%2": "error", "%3": "unknown" },
+          paneIds: ["%1", "%2", "%3"],
+        }),
+      ]),
+    ).toBeUndefined();
+  });
 });
 
 function session(
@@ -101,6 +197,7 @@ function session(
   input: {
     activePaneId?: string;
     attached?: boolean;
+    paneStatuses?: Partial<Record<string, TmuxPaneIntegrationStatus>>;
     paneIds?: string[];
     windowActive?: boolean;
   } = {},
@@ -114,7 +211,9 @@ function session(
         index: 1,
         name: "work",
         active: input.windowActive ?? true,
-        panes: (input.paneIds ?? ["%1"]).map((id) => pane(id, id === input.activePaneId)),
+        panes: (input.paneIds ?? ["%1"]).map((id) =>
+          pane(id, id === input.activePaneId, input.paneStatuses?.[id]),
+        ),
       },
     ],
     attached: input.attached ?? false,
@@ -124,7 +223,11 @@ function session(
   };
 }
 
-function pane(id: string, active = false): TmuxSession["windows"][number]["panes"][number] {
+function pane(
+  id: string,
+  active = false,
+  status?: TmuxPaneIntegrationStatus,
+): TmuxSession["windows"][number]["panes"][number] {
   return {
     id,
     index: Number(id.slice(1)),
@@ -133,5 +236,6 @@ function pane(id: string, active = false): TmuxSession["windows"][number]["panes
     title: "bash",
     processName: "bash",
     ssh: false,
+    ...(status ? { integration: { tool: "opencode", status } } : {}),
   };
 }

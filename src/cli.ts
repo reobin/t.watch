@@ -1,14 +1,28 @@
+import { nextJumpPaneId } from "./navigation";
+import { focusPaneForAllClients, listSessions } from "./tmux";
+
 type Output = {
   error(message: string): void;
   log(message: string): void;
 };
 
 type StartApp = () => Promise<void>;
+type TmuxActions = {
+  focusPaneForAllClients: typeof focusPaneForAllClients;
+  listSessions: typeof listSessions;
+};
+
+const usage = "Usage: thud [version|jump]";
+const tmuxActions: TmuxActions = {
+  focusPaneForAllClients,
+  listSessions,
+};
 
 export async function runCli(
   argv: string[],
   startApp: StartApp,
   output: Output = console,
+  tmux: TmuxActions = tmuxActions,
 ): Promise<number> {
   const args = argv.slice(2);
 
@@ -22,8 +36,36 @@ export async function runCli(
     return 0;
   }
 
-  output.error("Usage: thud [version]");
+  if (args.length === 1 && args[0] === "jump") {
+    return jumpToPane(output, tmux);
+  }
+
+  output.error(usage);
   return 1;
+}
+
+async function jumpToPane(output: Output, tmux: TmuxActions): Promise<number> {
+  const result = await tmux.listSessions();
+
+  if (result.ok === false) {
+    output.error(result.message);
+    return 1;
+  }
+
+  const paneId = nextJumpPaneId(result.sessions, process.env.TMUX_PANE);
+
+  if (!paneId) {
+    return 0;
+  }
+
+  const focusResult = await tmux.focusPaneForAllClients(paneId);
+
+  if (focusResult.ok === false) {
+    output.error(focusResult.message);
+    return 1;
+  }
+
+  return 0;
 }
 
 async function packageIdentifier(): Promise<string> {

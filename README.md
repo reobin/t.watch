@@ -12,6 +12,20 @@ Install globally from npm:
 npm install -g thud.sh
 thud version
 thud
+thud jump
+```
+
+Inside the HUD, press `j`/`k` or arrows to select sessions, `Enter` to focus the
+selected session, `J` to jump to the next matching pane, and `q` to quit.
+
+`thud jump` focuses the next pane with an integration status in this order:
+`requesting`, `idle`, then `working`. If nothing matches, it exits without
+changing focus.
+
+Example tmux binding:
+
+```tmux
+bind-key J run-shell 'thud jump'
 ```
 
 Or run from source:
