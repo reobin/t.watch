@@ -31,6 +31,7 @@ export function createScreen(
 ): Screen {
   renderer.setBackgroundColor(terminalBg);
   const textMutedFg = theme.textMutedFg ?? muted;
+  const backdropBg = commandPanelBackdropColor(theme);
   let modeIndicator: string | undefined;
 
   const layout = new BoxRenderable(renderer, {
@@ -81,6 +82,7 @@ export function createScreen(
   renderer.root.add(layout);
 
   const commandPanel = createCommandPanelOverlay(renderer, {
+    backdrop: backdropBg,
     background: terminalBg,
     foreground: terminalFg,
     mutedForeground: textMutedFg,
@@ -130,6 +132,10 @@ export function renderStatusLine(
     : [];
 
   return new StyledText(chunks);
+}
+
+export function commandPanelBackdropColor(_theme: RenderTheme = {}): RGBA {
+  return RGBA.fromInts(0, 0, 0, 0);
 }
 
 export function renderShortcutFooter(textMutedFg: RGBA, width: number): StyledText {

@@ -139,6 +139,7 @@ export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
 export function createCommandPanelOverlay(
   renderer: CliRenderer,
   colors: {
+    backdrop: RGBA;
     background: RGBA;
     foreground: RGBA;
     mutedForeground: RGBA;
@@ -167,7 +168,7 @@ export function createCommandPanelOverlay(
     height: "100%",
     zIndex: 0,
     opacity: backdropOpacity,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backdrop,
   });
 
   const panel = new BoxRenderable(renderer, {

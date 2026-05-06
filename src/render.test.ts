@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { RGBA, createTextAttributes } from "@opentui/core";
 import { renderCommandPanel, renderHelpPanel } from "./command-panel";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
-import { renderShortcutFooter, renderStatusLine } from "./screen";
+import { commandPanelBackdropColor, renderShortcutFooter, renderStatusLine } from "./screen";
 import type { TmuxSession } from "./tmux";
 
 describe("render", () => {
@@ -94,6 +94,14 @@ describe("render", () => {
     expect(text).toContain("? help");
     expect(text).not.toContain("m mode");
     expect(text.split("\n").every((line) => line.length <= 80)).toBe(true);
+  });
+
+  test("keeps the command panel backdrop transparent", () => {
+    const selectedBg = RGBA.fromInts(245, 245, 245);
+    const backdrop = commandPanelBackdropColor({ selectedBg });
+
+    expect(backdrop.equals(selectedBg)).toBe(false);
+    expect(backdrop.toInts()).toEqual([0, 0, 0, 0]);
   });
 
   test("renders the mode status line", () => {
