@@ -7,13 +7,13 @@ const palette = {
   green: 2,
   magenta: 5,
   cyan: 6,
+  gitDirty: 5,
   brightCyan: 14,
   gray: 8,
   selectedBg: 235,
 } as const;
 const rowLeftGutterWidth = 2;
 const rowRightGutterWidth = 2;
-const metadataPrefixWidth = 2;
 
 export type RenderTheme = {
   selectedBg?: RGBA;
@@ -65,10 +65,12 @@ function renderSession(
   textMutedFg: RGBA,
   width: number | undefined,
 ): TextChunk[] {
-  const header = fitMiddle(
-    `${session.name}${session.sshAttached ? " <ssh>" : ""}`,
-    sessionHeaderContentWidth(width),
-  );
+  const headerText = session.path
+    ? formatPathHeader(session, sessionHeaderContentWidth(width))
+    : formatSessionLabel(session);
+  const header = session.path
+    ? headerText
+    : fitMiddle(headerText, sessionHeaderContentWidth(width));
   const chunks: TextChunk[] = [
     renderSessionHeader(header, session),
     ...renderSessionMetadata(session, textMutedFg, width),
@@ -87,6 +89,8 @@ function renderSession(
           session.attached && window.active && pane.active,
           session.sshAttached,
           textMutedFg,
+          paneIndex < window.panes.length - 1,
+          width,
         ),
       ];
 
@@ -102,12 +106,9 @@ function renderSessionMetadata(
   textMutedFg: RGBA,
   width: number | undefined,
 ): TextChunk[] {
-  const lines = [
-    session.path ? fitPath(formatPath(session.path), metadataContentWidth(width)) : undefined,
-    fitOptional(formatBranch(session), metadataContentWidth(width)),
-  ].filter((line): line is string => Boolean(line));
+  const metadata = fitOptional(formatSessionMetadata(session), metadataContentWidth(width));
 
-  return lines.map((line) => muted(`\n· ${line}`, textMutedFg));
+  return metadata ? renderGitStatus(metadata, session.gitDirty, textMutedFg) : [];
 }
 
 function sessionHeaderContentWidth(width: number | undefined): number | undefined {
@@ -115,7 +116,7 @@ function sessionHeaderContentWidth(width: number | undefined): number | undefine
 }
 
 function metadataContentWidth(width: number | undefined): number | undefined {
-  return rowContentWidth(width, metadataPrefixWidth);
+  return rowContentWidth(width, 0);
 }
 
 function rowContentWidth(
@@ -143,6 +144,43 @@ function formatPath(path: string): string {
   return path;
 }
 
+function formatSessionMetadata(session: TmuxSession): string | undefined {
+  const branch = formatBranch(session);
+
+  if (!session.path) {
+    return branch;
+  }
+
+  return branch;
+}
+
+function formatSessionLabel(session: TmuxSession): string {
+  return `${session.name}${session.sshAttached ? " <ssh>" : ""}`;
+}
+
+function formatPathHeader(session: TmuxSession, width: number | undefined): string {
+  const path = formatPath(session.path ?? "");
+  const label = formatSessionLabel(session);
+
+  if (width === undefined) {
+    return `${path}  ${label}`;
+  }
+
+  const gap = "  ";
+  const labelReserve = Math.min(label.length, Math.max(0, Math.floor(width / 2)));
+  const leftWidth = Math.max(0, width - gap.length - labelReserve);
+
+  if (leftWidth <= 0) {
+    return fitPath(path, width);
+  }
+
+  const left = fitPath(path, leftWidth);
+  const right = fitMiddle(label, Math.max(0, width - gap.length - left.length));
+  const padding = " ".repeat(Math.max(gap.length, width - left.length - right.length));
+
+  return `${left}${padding}${right}`;
+}
+
 function fitOptional(text: string | undefined, width: number | undefined): string | undefined {
   return text === undefined ? undefined : fitMiddle(text, width);
 }
@@ -162,6 +200,20 @@ function fitMiddle(text: string, width: number | undefined): string {
   const suffixLength = width - marker.length - prefixLength;
 
   return `${text.slice(0, prefixLength)}${marker}${text.slice(text.length - suffixLength)}`;
+}
+
+function fitEnd(text: string, width: number | undefined): string {
+  if (width === undefined || text.length <= width) {
+    return text;
+  }
+
+  const marker = "...";
+
+  if (width <= marker.length) {
+    return marker.slice(0, width);
+  }
+
+  return `${text.slice(0, width - marker.length)}${marker}`;
 }
 
 function fitPath(path: string, width: number | undefined): string {
@@ -191,6 +243,20 @@ function formatBranch(session: TmuxSession): string | undefined {
   return session.gitBranch ? `${session.gitBranch}${session.gitDirty ? "*" : ""}` : undefined;
 }
 
+function renderGitStatus(
+  metadata: string,
+  dirty: boolean | undefined,
+  textMutedFg: RGBA,
+): TextChunk[] {
+  const dirtyMarker = dirty && metadata.endsWith("*") ? metadata.slice(-1) : "";
+  const branch = dirtyMarker ? metadata.slice(0, -1) : metadata;
+
+  return [
+    muted(`\n${branch}`, textMutedFg),
+    ...(dirtyMarker ? [terminalFg(palette.gitDirty, dirtyMarker)] : []),
+  ];
+}
+
 function renderSessionHeader(header: string, session: TmuxSession): TextChunk {
   if (session.sshAttached) {
     return bold(terminalFg(palette.magenta, header));
@@ -204,11 +270,45 @@ function renderPaneName(
   isActive: boolean,
   isSshAttachedSession: boolean,
   textMutedFg: RGBA,
+  hasFollowingPane: boolean,
+  width: number | undefined,
 ): TextChunk[] {
   return [
     renderPaneProcessName(pane, isActive, isSshAttachedSession),
     ...renderStatusPill(pane, textMutedFg),
+    ...renderPaneContext(pane, textMutedFg, hasFollowingPane, width),
   ];
+}
+
+function renderPaneContext(
+  pane: TmuxPane,
+  textMutedFg: RGBA,
+  hasFollowingPane: boolean,
+  width: number | undefined,
+): TextChunk[] {
+  const title = opencodeTitle(pane);
+  const prefix = hasFollowingPane ? "│  " : "   ";
+
+  return title
+    ? [muted(`\n${prefix}${fitEnd(title, paneContextContentWidth(width))}`, textMutedFg)]
+    : [];
+}
+
+function paneContextContentWidth(width: number | undefined): number | undefined {
+  return rowContentWidth(width, 3);
+}
+
+function opencodeTitle(pane: TmuxPane): string | undefined {
+  if (pane.processName !== "opencode" && pane.integration?.tool !== "opencode") {
+    return undefined;
+  }
+
+  const title = pane.title
+    .replace(/^OC \|\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return title && title !== pane.title ? title : undefined;
 }
 
 function renderPaneProcessName(

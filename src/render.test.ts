@@ -159,9 +159,8 @@ describe("render", () => {
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
-        "  work",
-        "  · /repo/work",
-        "  · main*",
+        "  /repo/work  work",
+        "  main*",
         "  ╭─ opencode ● working",
         "  ╰─ bash",
         "  ╶─ bun",
@@ -169,7 +168,7 @@ describe("render", () => {
         "  ╶─ vim",
       ].join("\n"),
     );
-    expect(output.chunks.find((chunk) => chunk.text === "work")?.attributes).toBe(
+    expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.attributes).toBe(
       createTextAttributes({ bold: true }),
     );
     expect(output.chunks.find((chunk) => chunk.text === "notes <ssh>")?.attributes).toBe(
@@ -185,10 +184,12 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.slot).toBe(6);
     expect(output.chunks.find((chunk) => chunk.text === " working")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(8);
-    expect(output.chunks.find((chunk) => chunk.text === "work")?.fg).toBeDefined();
-    expect(output.chunks.find((chunk) => chunk.text === "work")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === "· /repo/work")?.attributes).toBe(0);
-    expect(output.chunks.find((chunk) => chunk.text === "· main*")?.fg?.slot).toBe(8);
+    expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg).toBeDefined();
+    expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg?.slot).toBe(6);
+    expect(output.chunks.find((chunk) => chunk.text === "main")?.attributes).toBe(0);
+    expect(output.chunks.find((chunk) => chunk.text === "main")?.fg?.slot).toBe(8);
+    expect(output.chunks.find((chunk) => chunk.text === "*")?.attributes).toBe(0);
+    expect(output.chunks.find((chunk) => chunk.text === "*")?.fg?.slot).toBe(5);
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window");
@@ -208,7 +209,7 @@ describe("render", () => {
     ]);
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
-      ["  session", "  · ~/dev/thud.sh", "  · main", "  ╶─ bash"].join("\n"),
+      ["  ~/dev/thud.sh  session", "  main", "  ╶─ bash"].join("\n"),
     );
   });
 
@@ -226,10 +227,29 @@ describe("render", () => {
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("▎ · ~/dev/tpg/admi.../feedback  ");
-    expect(text).toContain("▎ · feat/feedback");
+    expect(text).toContain("▎ ~/dev/t.../feedback  default  ");
+    expect(text).toContain("▎ feat/feedback");
     expect(text).toContain("▎ ╶─ opencode");
     expect(text.split("\n").every((line) => line.length <= 32)).toBe(true);
+  });
+
+  test("uses short paths to leave room for long session names", () => {
+    const output = renderSessions(
+      [
+        session({
+          name: "very-long-session",
+          path: homedir(),
+          windows: [window({ panes: [pane({ processName: "opencode" })] })],
+        }),
+      ],
+      "$1",
+      { width: 25 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("▎ ~   very-long-session  ");
+    expect(text).not.toContain("very...ion");
+    expect(text.split("\n").every((line) => line.length <= 25)).toBe(true);
   });
 
   test("shortens long session names and branches within the terminal width", () => {
@@ -247,7 +267,7 @@ describe("render", () => {
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
     expect(text).toContain("▎ tpg/admin~f...ck-session  ");
-    expect(text).toContain("▎ · feat/very-...ck-branch  ");
+    expect(text).toContain("▎ feat/very-l...ack-branch  ");
     expect(text).toContain("▎ ╶─ opencode");
     expect(text.split("\n").every((line) => line.length <= 28)).toBe(true);
   });
@@ -304,6 +324,116 @@ describe("render", () => {
     for (const chunk of markers) {
       expect(chunk.fg).toBeDefined();
     }
+  });
+
+  test("renders OpenCode pane titles as pane context", () => {
+    const output = renderSessions([
+      session({
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                title: "OC | Session data and metadata layout",
+                integration: { tool: "opencode", status: "working" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("opencode ● working\n     Session data and metadata layout");
+    expect(
+      output.chunks.find((chunk) => chunk.text === "   Session data and metadata layout")?.fg?.slot,
+    ).toBe(8);
+  });
+
+  test("continues OpenCode pane context guides only when panes follow", () => {
+    const output = renderSessions([
+      session({
+        windows: [
+          window({
+            panes: [
+              pane({ processName: "bun" }),
+              pane({ processName: "bash" }),
+              pane({ processName: "bun" }),
+              pane({
+                processName: "opencode",
+                title: "OC | Code review workflow in progress",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+              pane({
+                processName: "opencode",
+                title: "OC | Light mode terminal color palette",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("├─ opencode ● idle\n  │  Code review workflow in progress");
+    expect(text).toContain("╰─ opencode ● idle\n     Light mode terminal color palette");
+    expect(text).not.toContain("╰─ opencode ● idle\n  │  Light mode terminal color palette");
+  });
+
+  test("continues OpenCode pane context guides for selected panes with following panes", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({
+                  id: "%1",
+                  processName: "opencode",
+                  title: "OC | Selected pane context",
+                  integration: { tool: "opencode", status: "working" },
+                }),
+                pane({ id: "%2", processName: "bash" }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { selectedPaneId: "%1" },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const contextChunk = output.chunks.find((chunk) => chunk.text === "│  Selected pane context");
+
+    expect(text).toContain("▎ ▶─ opencode ● working\n▎ │  Selected pane context");
+    expect(contextChunk?.bg?.slot).toBe(235);
+  });
+
+  test("shortens OpenCode pane titles within the terminal width", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({
+                  processName: "opencode",
+                  title: "OC | Helium dotfiles and swipe back deactivation",
+                  integration: { tool: "opencode", status: "idle" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { width: 32 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("▎    Helium dotfiles and sw...  ");
+    expect(text.split("\n").every((line) => line.length <= 32)).toBe(true);
   });
 
   test("renders ssh panes in the ssh color", () => {
@@ -431,11 +561,9 @@ describe("render", () => {
       undefined,
       { textMutedFg },
     );
-    const pathChunk = output.chunks.find((chunk) => chunk.text === "· /repo/work");
     const statusLabelChunk = output.chunks.find((chunk) => chunk.text === " unknown");
     const unknownStatusChunk = output.chunks.find((chunk) => chunk.text === "●");
 
-    expect(pathChunk?.fg?.equals(textMutedFg)).toBe(true);
     expect(statusLabelChunk?.fg?.equals(textMutedFg)).toBe(true);
     expect(unknownStatusChunk?.fg?.equals(textMutedFg)).toBe(true);
   });
