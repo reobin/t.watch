@@ -96,6 +96,7 @@ export function createScreen(
 function renderShortcutFooter(textMutedFg: RGBA, width: number): StyledText {
   const items = [
     [fg(terminalFg)("j/k"), fg(textMutedFg)(" select")],
+    [fg(terminalFg)("tab"), fg(textMutedFg)(" panes")],
     [fg(terminalFg)("↵"), fg(textMutedFg)(" focus")],
     [fg(terminalFg)("ctrl+p"), fg(textMutedFg)(" commands")],
     [fg(terminalFg)("q"), fg(textMutedFg)(" quit")],

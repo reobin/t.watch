@@ -13,12 +13,16 @@ import { createScreen } from "./screen";
 import { detectRenderTheme } from "./theme";
 import {
   findCurrentSessionId,
+  findActivePaneId,
   firstPaneId,
   firstSessionId,
+  hasPane,
   hasSession,
   isAttachedActivePane,
   nextJumpPaneId,
+  selectNextPane,
   selectNextSession,
+  selectPreviousPane,
   selectPreviousSession,
 } from "./navigation";
 
@@ -38,6 +42,8 @@ export async function startApp(): Promise<void> {
   let isFocusingPane = false;
   let selectedSessionId: string | undefined;
   let currentSessionId: string | undefined;
+  let selectedPaneId: string | undefined;
+  let paneNavigationOpen = false;
   let sessions: TmuxSession[] = [];
   let terminalWidth = 0;
   let commandPanelOpen = false;
@@ -151,6 +157,41 @@ export async function startApp(): Promise<void> {
       return;
     }
 
+    if (key.name === "tab") {
+      key.preventDefault();
+      togglePaneNavigation();
+      return;
+    }
+
+    if (paneNavigationOpen) {
+      if (key.name === "escape" || key.name === "esc") {
+        key.preventDefault();
+        closePaneNavigation();
+        renderCurrentView();
+        return;
+      }
+
+      if (key.name === "j" || key.name === "down") {
+        key.preventDefault();
+        selectedPaneId = selectNextPane(selectedSession(), selectedPaneId);
+        renderCurrentView();
+        return;
+      }
+
+      if (key.name === "k" || key.name === "up") {
+        key.preventDefault();
+        selectedPaneId = selectPreviousPane(selectedSession(), selectedPaneId);
+        renderCurrentView();
+        return;
+      }
+
+      if (key.name === "enter" || key.name === "return") {
+        key.preventDefault();
+        void focusSelectedPane();
+        return;
+      }
+    }
+
     if (key.name === "j" || key.name === "down") {
       key.preventDefault();
       selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
@@ -234,6 +275,7 @@ export async function startApp(): Promise<void> {
       sessions = [];
       selectedSessionId = undefined;
       currentSessionId = undefined;
+      closePaneNavigation();
       screen.setContent(renderMessage(result.message));
       return;
     }
@@ -252,8 +294,10 @@ export async function startApp(): Promise<void> {
       selectedSessionId = nextCurrentSessionId;
     }
     currentSessionId = nextCurrentSessionId;
+    syncSelectedPane();
 
     if (sessions.length === 0) {
+      closePaneNavigation();
       screen.setContent(renderNoSessions());
       return;
     }
@@ -278,6 +322,7 @@ export async function startApp(): Promise<void> {
     screen.setContent(
       renderSessions(sessions, selectedSessionId, {
         ...renderTheme,
+        selectedPaneId: paneNavigationOpen ? selectedPaneId : undefined,
         width: terminalWidth,
       }),
     );
@@ -301,6 +346,23 @@ export async function startApp(): Promise<void> {
     screen.setCommandPanelVisible(false);
   }
 
+  function closePaneNavigation(): void {
+    paneNavigationOpen = false;
+    selectedPaneId = undefined;
+  }
+
+  function togglePaneNavigation(): void {
+    if (paneNavigationOpen) {
+      closePaneNavigation();
+      renderCurrentView();
+      return;
+    }
+
+    paneNavigationOpen = true;
+    selectedPaneId = findActivePaneId(selectedSession());
+    renderCurrentView();
+  }
+
   function commandPanelWidth(width: number): number {
     return Math.max(1, Math.min(commandPanelMaxWidth, width - commandPanelHorizontalMargin, width));
   }
@@ -316,6 +378,7 @@ export async function startApp(): Promise<void> {
     }
 
     selectedSessionId = nextSelectedSessionId;
+    syncSelectedPane();
     renderCurrentView();
   }
 
@@ -330,6 +393,17 @@ export async function startApp(): Promise<void> {
       return;
     }
 
+    await focusPane(paneId);
+  }
+
+  async function focusSelectedPane(): Promise<void> {
+    if (!selectedPaneId) {
+      return;
+    }
+
+    const paneId = selectedPaneId;
+
+    closePaneNavigation();
     await focusPane(paneId);
   }
 
@@ -360,6 +434,23 @@ export async function startApp(): Promise<void> {
       await refreshSessions();
     } finally {
       isFocusingPane = false;
+    }
+  }
+
+  function selectedSession(): TmuxSession | undefined {
+    return sessions.find((session) => session.id === selectedSessionId);
+  }
+
+  function syncSelectedPane(): void {
+    if (!paneNavigationOpen) {
+      selectedPaneId = undefined;
+      return;
+    }
+
+    const session = selectedSession();
+
+    if (!hasPane(session, selectedPaneId)) {
+      selectedPaneId = findActivePaneId(session);
     }
   }
 }

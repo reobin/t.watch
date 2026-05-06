@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
   findCurrentSessionId,
+  findActivePaneId,
   firstPaneId,
   firstSessionId,
+  hasPane,
   hasSession,
   isAttachedActivePane,
   nextJumpPaneId,
+  selectNextPane,
   selectNextSession,
+  selectPreviousPane,
   selectPreviousSession,
 } from "./navigation";
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
@@ -76,6 +80,33 @@ describe("session navigation", () => {
     expect(firstPaneId(session("$1", { paneIds: ["%1", "%2"] }))).toBe("%1");
     expect(firstPaneId(session("$1", { paneIds: [] }))).toBeUndefined();
     expect(firstPaneId(undefined)).toBeUndefined();
+  });
+
+  test("finds the active pane in the active window", () => {
+    expect(findActivePaneId(session("$1", { activePaneId: "%2", paneIds: ["%1", "%2"] }))).toBe(
+      "%2",
+    );
+    expect(findActivePaneId(session("$1", { paneIds: ["%1", "%2"] }))).toBe("%1");
+    expect(findActivePaneId(undefined)).toBeUndefined();
+  });
+
+  test("checks if a pane exists in a session", () => {
+    const currentSession = session("$1", { paneIds: ["%1", "%2"] });
+
+    expect(hasPane(currentSession, "%2")).toBe(true);
+    expect(hasPane(currentSession, "%3")).toBe(false);
+    expect(hasPane(currentSession, undefined)).toBe(false);
+    expect(hasPane(undefined, "%1")).toBe(false);
+  });
+
+  test("selects panes within the current session", () => {
+    const currentSession = session("$1", { activePaneId: "%2", paneIds: ["%1", "%2", "%3"] });
+
+    expect(selectNextPane(currentSession, undefined)).toBe("%3");
+    expect(selectPreviousPane(currentSession, undefined)).toBe("%1");
+    expect(selectNextPane(currentSession, "%3")).toBe("%1");
+    expect(selectPreviousPane(currentSession, "%1")).toBe("%3");
+    expect(selectNextPane(undefined, undefined)).toBeUndefined();
   });
 
   test("checks if a pane is active in the attached session", () => {
