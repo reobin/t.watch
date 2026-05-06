@@ -127,12 +127,12 @@ describe("session navigation", () => {
     ).toBe(false);
   });
 
-  test("finds the next requesting pane after the current pane", () => {
+  test("finds the next waiting pane after the current pane", () => {
     const sessions = [
       session("$1", {
         activePaneId: "%1",
         attached: true,
-        paneStatuses: { "%2": "idle", "%3": "requesting" },
+        paneStatuses: { "%2": "idle", "%3": "waiting" },
         paneIds: ["%1", "%2", "%3"],
       }),
     ];
@@ -140,13 +140,13 @@ describe("session navigation", () => {
     expect(nextJumpPaneId(sessions)).toBe("%3");
   });
 
-  test("falls back to idle then working panes", () => {
+  test("falls back to idle then running panes", () => {
     expect(
       nextJumpPaneId([
         session("$1", {
           activePaneId: "%1",
           attached: true,
-          paneStatuses: { "%2": "working", "%3": "idle" },
+          paneStatuses: { "%2": "running", "%3": "idle" },
           paneIds: ["%1", "%2", "%3"],
         }),
       ]),
@@ -157,7 +157,7 @@ describe("session navigation", () => {
         session("$1", {
           activePaneId: "%1",
           attached: true,
-          paneStatuses: { "%2": "working" },
+          paneStatuses: { "%2": "running" },
           paneIds: ["%1", "%2"],
         }),
       ]),
@@ -169,7 +169,7 @@ describe("session navigation", () => {
       session("$1", {
         activePaneId: "%3",
         attached: true,
-        paneStatuses: { "%1": "requesting" },
+        paneStatuses: { "%1": "waiting" },
         paneIds: ["%1", "%2", "%3"],
       }),
     ];
@@ -182,7 +182,7 @@ describe("session navigation", () => {
       session("$1", {
         activePaneId: "%1",
         attached: true,
-        paneStatuses: { "%1": "requesting", "%2": "idle" },
+        paneStatuses: { "%1": "waiting", "%2": "idle" },
         paneIds: ["%1", "%2"],
       }),
     ];
@@ -195,13 +195,13 @@ describe("session navigation", () => {
       session("$1", {
         activePaneId: "%1",
         attached: true,
-        paneStatuses: { "%2": "requesting" },
+        paneStatuses: { "%2": "waiting" },
         paneIds: ["%1", "%2"],
       }),
       session("$2", {
         activePaneId: "%4",
         attached: true,
-        paneStatuses: { "%5": "requesting" },
+        paneStatuses: { "%5": "waiting" },
         paneIds: ["%3", "%4", "%5"],
       }),
     ];

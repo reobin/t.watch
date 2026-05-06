@@ -1,9 +1,9 @@
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const jumpStatusPriority = [
-  "requesting",
+  "waiting",
   "idle",
-  "working",
+  "running",
 ] as const satisfies readonly TmuxPaneIntegrationStatus[];
 
 export function selectNextSession(

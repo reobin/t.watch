@@ -167,7 +167,7 @@ describe("runCli", () => {
         session("$1", {
           activePaneId: "%1",
           attached: true,
-          paneStatuses: { "%2": "idle", "%3": "requesting" },
+          paneStatuses: { "%2": "idle", "%3": "waiting" },
           paneIds: ["%1", "%2", "%3"],
         }),
       ],
@@ -196,13 +196,13 @@ describe("runCli", () => {
         session("$1", {
           activePaneId: "%1",
           attached: true,
-          paneStatuses: { "%2": "requesting" },
+          paneStatuses: { "%2": "waiting" },
           paneIds: ["%1", "%2"],
         }),
         session("$2", {
           activePaneId: "%4",
           attached: true,
-          paneStatuses: { "%5": "requesting" },
+          paneStatuses: { "%5": "waiting" },
           paneIds: ["%3", "%4", "%5"],
         }),
       ],
@@ -266,7 +266,7 @@ describe("runCli", () => {
         session("$1", {
           activePaneId: "%1",
           attached: true,
-          paneStatuses: { "%2": "requesting" },
+          paneStatuses: { "%2": "waiting" },
           paneIds: ["%1", "%2"],
         }),
       ],

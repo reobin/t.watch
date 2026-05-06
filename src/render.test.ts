@@ -143,7 +143,7 @@ describe("render", () => {
                 processName: "opencode",
                 active: true,
                 ssh: false,
-                integration: { tool: "opencode", status: "working" },
+                integration: { tool: "opencode", status: "running" },
               }),
               pane({ processName: "bash", active: false }),
             ],
@@ -169,7 +169,7 @@ describe("render", () => {
       [
         "  /repo/work  work",
         "  main*",
-        "  ╭─ opencode ● working",
+        "  ╭─ opencode ● running",
         "  ╰─ bash",
         "  ╶─ bun",
         "  notes <ssh>",
@@ -190,8 +190,8 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.intent).toBe("indexed");
     expect(output.chunks.find((chunk) => chunk.text === "●")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === " working")?.attributes).toBe(0);
-    expect(output.chunks.find((chunk) => chunk.text === " working")?.fg?.slot).toBe(8);
+    expect(output.chunks.find((chunk) => chunk.text === " running")?.attributes).toBe(0);
+    expect(output.chunks.find((chunk) => chunk.text === " running")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg?.slot).toBe(6);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.attributes).toBe(0);
@@ -292,11 +292,11 @@ describe("render", () => {
               }),
               pane({
                 processName: "opencode",
-                integration: { tool: "opencode", status: "working" },
+                integration: { tool: "opencode", status: "running" },
               }),
               pane({
                 processName: "opencode",
-                integration: { tool: "opencode", status: "requesting" },
+                integration: { tool: "opencode", status: "waiting" },
               }),
               pane({
                 processName: "opencode",
@@ -314,8 +314,8 @@ describe("render", () => {
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
     expect(text).toContain("● idle");
-    expect(text).toContain("● working");
-    expect(text).toContain("● requesting");
+    expect(text).toContain("● running");
+    expect(text).toContain("● waiting");
     expect(text).toContain("● error");
     expect(text).toContain("● unknown");
     const markers = output.chunks.filter((chunk) => chunk.text === "●");
@@ -343,7 +343,7 @@ describe("render", () => {
               pane({
                 processName: "opencode",
                 title: "OC | Session data and metadata layout",
-                integration: { tool: "opencode", status: "working" },
+                integration: { tool: "opencode", status: "running" },
               }),
             ],
           }),
@@ -352,7 +352,7 @@ describe("render", () => {
     ]);
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("opencode ● working\n     Session data and metadata layout");
+    expect(text).toContain("opencode ● running\n     Session data and metadata layout");
     expect(
       output.chunks.find((chunk) => chunk.text === "   Session data and metadata layout")?.fg?.slot,
     ).toBe(8);
@@ -400,7 +400,7 @@ describe("render", () => {
                   id: "%1",
                   processName: "opencode",
                   title: "OC | Selected pane context",
-                  integration: { tool: "opencode", status: "working" },
+                  integration: { tool: "opencode", status: "running" },
                 }),
                 pane({ id: "%2", processName: "bash" }),
               ],
@@ -414,7 +414,7 @@ describe("render", () => {
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const contextChunk = output.chunks.find((chunk) => chunk.text === "│  Selected pane context");
 
-    expect(text).toContain("▎ ▶─ opencode ● working\n▎ │  Selected pane context");
+    expect(text).toContain("▎ ▶─ opencode ● running\n▎ │  Selected pane context");
     expect(contextChunk?.bg?.slot).toBe(235);
   });
 

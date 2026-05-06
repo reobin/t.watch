@@ -301,8 +301,8 @@ function parsePaneIntegrationStatus(
 ): TmuxPaneIntegrationStatus | undefined {
   if (
     status === "idle" ||
-    status === "working" ||
-    status === "requesting" ||
+    status === "running" ||
+    status === "waiting" ||
     status === "error" ||
     status === "unknown"
   ) {

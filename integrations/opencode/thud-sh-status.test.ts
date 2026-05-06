@@ -6,14 +6,14 @@ describe("ThudShStatus", () => {
     delete process.env.TMUX_PANE;
   });
 
-  test("marks OpenCode questions as requesting", async () => {
+  test("marks OpenCode questions as waiting", async () => {
     process.env.TMUX_PANE = "%1";
     const shell = mockShell();
     const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ });
 
     await plugin.event({ event: { type: "question.asked" } });
 
-    expect(statuses(shell.calls)).toEqual(["idle", "requesting"]);
+    expect(statuses(shell.calls)).toEqual(["idle", "waiting"]);
   });
 
   test("restores idle after answered or dismissed OpenCode questions", async () => {
@@ -25,10 +25,10 @@ describe("ThudShStatus", () => {
     await plugin.event({ event: { type: "question.replied" } });
     await plugin.event({ event: { type: "question.rejected" } });
 
-    expect(statuses(shell.calls)).toEqual(["idle", "requesting", "idle"]);
+    expect(statuses(shell.calls)).toEqual(["idle", "waiting", "idle"]);
   });
 
-  test("restores working after answered OpenCode questions while busy", async () => {
+  test("restores running after answered OpenCode questions while busy", async () => {
     process.env.TMUX_PANE = "%1";
     const shell = mockShell();
     const plugin = await ThudShStatus({ $: shell.$ as typeof Bun.$ });
@@ -39,7 +39,7 @@ describe("ThudShStatus", () => {
     await plugin.event({ event: { type: "question.asked" } });
     await plugin.event({ event: { type: "question.replied" } });
 
-    expect(statuses(shell.calls)).toEqual(["idle", "working", "requesting", "working"]);
+    expect(statuses(shell.calls)).toEqual(["idle", "running", "waiting", "running"]);
   });
 
   test("restores idle after dismissed OpenCode questions while busy", async () => {
@@ -53,7 +53,7 @@ describe("ThudShStatus", () => {
     await plugin.event({ event: { type: "question.asked" } });
     await plugin.event({ event: { type: "question.rejected" } });
 
-    expect(statuses(shell.calls)).toEqual(["idle", "working", "requesting", "idle"]);
+    expect(statuses(shell.calls)).toEqual(["idle", "running", "waiting", "idle"]);
   });
 
   test("restores idle after rejected OpenCode permissions while busy", async () => {
@@ -69,7 +69,7 @@ describe("ThudShStatus", () => {
       event: { type: "permission.replied", properties: { reply: "reject" } },
     });
 
-    expect(statuses(shell.calls)).toEqual(["idle", "working", "requesting", "idle"]);
+    expect(statuses(shell.calls)).toEqual(["idle", "running", "waiting", "idle"]);
   });
 });
 

@@ -47,26 +47,26 @@ export const ThudShStatus = async ({ $ }: OpenCodePluginContext) => {
   }
 
   async function requestStatus(): Promise<void> {
-    if (currentStatus !== "requesting") {
+    if (currentStatus !== "waiting") {
       statusBeforeRequest = currentStatus;
     }
 
-    await queueStatus("requesting");
+    await queueStatus("waiting");
   }
 
   async function restoreStatusAfterRequest(): Promise<void> {
-    if (currentStatus !== "requesting") {
+    if (currentStatus !== "waiting") {
       return;
     }
 
-    const restoredStatus = statusBeforeRequest === "idle" ? "idle" : "working";
+    const restoredStatus = statusBeforeRequest === "idle" ? "idle" : "running";
     statusBeforeRequest = undefined;
 
     await queueStatus(restoredStatus);
   }
 
   async function rejectRequestStatus(): Promise<void> {
-    if (currentStatus !== "requesting") {
+    if (currentStatus !== "waiting") {
       return;
     }
 
@@ -83,12 +83,12 @@ export const ThudShStatus = async ({ $ }: OpenCodePluginContext) => {
         const status = event.properties?.status?.type;
 
         if (status === "busy") {
-          await queueStatus("working");
+          await queueStatus("running");
           return;
         }
 
         if (status === "retry") {
-          await queueStatus("working");
+          await queueStatus("running");
           return;
         }
 
