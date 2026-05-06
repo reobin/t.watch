@@ -150,6 +150,46 @@ describe("render", () => {
     );
   });
 
+  test("shortens long paths to keep session rows within the terminal width", () => {
+    const output = renderSessions(
+      [
+        session({
+          path: `${homedir()}/dev/tpg/admin/.wt/feat/feedback`,
+          gitBranch: "feat/feedback",
+          windows: [window({ panes: [pane({ processName: "opencode" })] })],
+        }),
+      ],
+      "$1",
+      { width: 32 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("▎ · ~/dev/tpg/admi.../feedback  ");
+    expect(text).toContain("▎ · feat/feedback");
+    expect(text).toContain("▎ ╶─ opencode");
+    expect(text.split("\n").every((line) => line.length <= 32)).toBe(true);
+  });
+
+  test("shortens long session names and branches within the terminal width", () => {
+    const output = renderSessions(
+      [
+        session({
+          name: "tpg/admin~feat/very-long-feedback-session",
+          gitBranch: "feat/very-long-feedback-branch",
+          windows: [window({ panes: [pane({ processName: "opencode" })] })],
+        }),
+      ],
+      "$1",
+      { width: 28 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("▎ tpg/admin~f...ck-session  ");
+    expect(text).toContain("▎ · feat/very-...ck-branch  ");
+    expect(text).toContain("▎ ╶─ opencode");
+    expect(text.split("\n").every((line) => line.length <= 28)).toBe(true);
+  });
+
   test("renders integration status markers", () => {
     const output = renderSessions([
       session({

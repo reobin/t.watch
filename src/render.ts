@@ -11,6 +11,9 @@ const palette = {
   gray: 8,
   selectedBg: 235,
 } as const;
+const rowLeftGutterWidth = 2;
+const rowRightGutterWidth = 2;
+const metadataPrefixWidth = 2;
 
 export type RenderTheme = {
   selectedBg?: RGBA;
@@ -53,10 +56,13 @@ function renderSession(
   textMutedFg: RGBA,
   width: number | undefined,
 ): TextChunk[] {
-  const header = `${session.name}${session.sshAttached ? " <ssh>" : ""}`;
+  const header = fitMiddle(
+    `${session.name}${session.sshAttached ? " <ssh>" : ""}`,
+    sessionHeaderContentWidth(width),
+  );
   const chunks: TextChunk[] = [
     renderSessionHeader(header, session),
-    ...renderSessionMetadata(session, textMutedFg),
+    ...renderSessionMetadata(session, textMutedFg, width),
   ];
   const isSelectedSession = session.id === selectedSessionId;
 
@@ -81,12 +87,36 @@ function renderSession(
   return sessionBlock(chunks, isSelectedSession, selectedBg, width);
 }
 
-function renderSessionMetadata(session: TmuxSession, textMutedFg: RGBA): TextChunk[] {
-  const lines = [session.path ? formatPath(session.path) : undefined, formatBranch(session)].filter(
-    (line): line is string => Boolean(line),
-  );
+function renderSessionMetadata(
+  session: TmuxSession,
+  textMutedFg: RGBA,
+  width: number | undefined,
+): TextChunk[] {
+  const lines = [
+    session.path ? fitPath(formatPath(session.path), metadataContentWidth(width)) : undefined,
+    fitOptional(formatBranch(session), metadataContentWidth(width)),
+  ].filter((line): line is string => Boolean(line));
 
   return lines.map((line) => muted(`\n· ${line}`, textMutedFg));
+}
+
+function sessionHeaderContentWidth(width: number | undefined): number | undefined {
+  return rowContentWidth(width, 0);
+}
+
+function metadataContentWidth(width: number | undefined): number | undefined {
+  return rowContentWidth(width, metadataPrefixWidth);
+}
+
+function rowContentWidth(
+  width: number | undefined,
+  leftContentPrefixWidth: number,
+): number | undefined {
+  if (width === undefined) {
+    return undefined;
+  }
+
+  return Math.max(0, width - rowLeftGutterWidth - leftContentPrefixWidth - rowRightGutterWidth);
 }
 
 function formatPath(path: string): string {
@@ -101,6 +131,50 @@ function formatPath(path: string): string {
   }
 
   return path;
+}
+
+function fitOptional(text: string | undefined, width: number | undefined): string | undefined {
+  return text === undefined ? undefined : fitMiddle(text, width);
+}
+
+function fitMiddle(text: string, width: number | undefined): string {
+  if (width === undefined || text.length <= width) {
+    return text;
+  }
+
+  const marker = "...";
+
+  if (width <= marker.length) {
+    return marker.slice(0, width);
+  }
+
+  const prefixLength = Math.ceil((width - marker.length) / 2);
+  const suffixLength = width - marker.length - prefixLength;
+
+  return `${text.slice(0, prefixLength)}${marker}${text.slice(text.length - suffixLength)}`;
+}
+
+function fitPath(path: string, width: number | undefined): string {
+  if (width === undefined || path.length <= width) {
+    return path;
+  }
+
+  const marker = "...";
+
+  if (width <= marker.length) {
+    return marker.slice(0, width);
+  }
+
+  const lastSeparatorIndex = path.lastIndexOf("/");
+  const suffix = lastSeparatorIndex > 0 ? path.slice(lastSeparatorIndex) : "";
+
+  if (suffix.length > 0 && marker.length + suffix.length >= width) {
+    return `${marker}${suffix.slice(marker.length + suffix.length - width)}`;
+  }
+
+  const prefixLength = width - marker.length - suffix.length;
+
+  return `${path.slice(0, prefixLength)}${marker}${suffix}`;
 }
 
 function formatBranch(session: TmuxSession): string | undefined {
