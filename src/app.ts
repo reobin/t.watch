@@ -1,4 +1,5 @@
 import { createCliRenderer } from "@opentui/core";
+import { benchNow, createBenchRun, elapsedMs } from "./benchmark";
 import {
   checkTmux,
   focusPaneForAllClients,
@@ -59,7 +60,13 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let appMode: AppMode = options.closeOnFocus ? "popup" : "default";
   let defaultModeIndicatorTimer: ReturnType<typeof setTimeout> | undefined;
   const appPaneId = process.env.TMUX_PANE;
+  const startupBench = createBenchRun("startup", {
+    mode: appMode,
+    closeOnFocus: Boolean(options.closeOnFocus),
+    processUptimeAtStartMs: Math.round(process.uptime() * 10000) / 10,
+  });
 
+  const rendererStartedAt = benchNow();
   const renderer = await createCliRenderer({
     exitOnCtrlC: true,
     onDestroy: () => {
@@ -77,9 +84,12 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       void sessionWatcher?.stop();
     },
   });
+  startupBench.add({ rendererMs: elapsedMs(rendererStartedAt) });
 
   process.stdout.write(enableTerminalFocusReporting);
+  const themeStartedAt = benchNow();
   const renderTheme = await detectRenderTheme(renderer, paletteTimeoutMs);
+  startupBench.add({ themeMs: elapsedMs(themeStartedAt) });
   const screen = createScreen(renderer, renderLoading(), renderTheme);
   terminalWidth = renderer.width;
   const commands: (CommandPanelItem & { run: () => void | Promise<void> })[] = [
@@ -264,14 +274,40 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       void focusSelectedSession();
     }
   });
+  const tmuxCheckStartedAt = benchNow();
   const tmux = await checkTmux();
+  startupBench.add({ tmuxCheckMs: elapsedMs(tmuxCheckStartedAt) });
 
   if (tmux.ok === true) {
-    await ensureSessionWatcher();
+    const refreshStartedAt = benchNow();
     await refreshSessions();
+    startupBench.add({
+      firstRenderMs: startupBench.elapsed(),
+      processUptimeAtFirstRenderMs: Math.round(process.uptime() * 10000) / 10,
+      refreshSessionsMs: elapsedMs(refreshStartedAt),
+      sessionCount: sessions.length,
+    });
+
+    if (appMode !== "popup") {
+      void benchmarkSessionWatcher();
+    }
+
     startRefreshPolling();
+    startupBench.log({ ok: true, watcherSkipped: appMode === "popup" });
   } else {
     screen.setContent(renderMessage(tmux.message));
+    startupBench.log({ ok: false, message: tmux.message });
+  }
+
+  async function benchmarkSessionWatcher(): Promise<void> {
+    if (isDestroyed || sessionWatcher || isStartingWatcher) {
+      return;
+    }
+
+    const watcherBench = createBenchRun("watcher_startup", { mode: appMode });
+
+    await ensureSessionWatcher();
+    watcherBench.log({ watcherMs: watcherBench.elapsed(), ok: Boolean(sessionWatcher) });
   }
 
   async function ensureSessionWatcher(): Promise<void> {
@@ -313,7 +349,10 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
     refreshTimer = setInterval(() => {
       void refreshSessions();
-      void ensureSessionWatcher();
+
+      if (appMode !== "popup") {
+        void benchmarkSessionWatcher();
+      }
     }, refreshIntervalMs);
   }
 

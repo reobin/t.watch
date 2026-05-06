@@ -1,3 +1,4 @@
+import { formatBenchSummary } from "./benchmark";
 import { nextJumpPaneId } from "./navigation";
 import { focusPaneForAllClients, listSessions } from "./tmux";
 import type { AppOptions } from "./app";
@@ -15,13 +16,14 @@ type TmuxActions = {
 type AppMode = "default" | "popup";
 
 const help = `Usage: thud [--mode=default|popup] [--close-on-focus]
-       thud [help|version|jump]
+       thud [help|version|jump|bench-results [path]]
 
 Commands:
   thud          Start the HUD
   thud help     Show help
   thud version  Print the installed package version
   thud jump     Focus the next pane needing attention
+  thud bench-results  Summarize recorded benchmark results
 
 Options:
   --mode=default     Keep thud open after focusing a target
@@ -58,6 +60,11 @@ export async function runCli(
 
   if (args.length === 1 && args[0] === "jump") {
     return jumpToPane(output, tmux);
+  }
+
+  if (args[0] === "bench-results" && args.length <= 2) {
+    output.log(formatBenchSummary(args[1]));
+    return 0;
   }
 
   output.error(help);

@@ -15,6 +15,7 @@ thud version
 thud
 thud --mode=popup
 thud jump
+thud bench-results
 ```
 
 Inside the HUD, the footer shows `Ctrl+P` for commands and `?` for help. Press
@@ -30,6 +31,11 @@ cycle focus mode, and `q` to quit.
 `requesting`, `idle`, then `working`. If nothing matches, it exits without
 changing focus.
 
+Enable benchmark logging with `THUD_BENCH=1`. By default timings are appended to
+`/tmp/thud-sh-bench.jsonl`; set `THUD_BENCH_LOG=/path/to/log.jsonl` to override
+it. Run `thud bench-results` or `thud bench-results /path/to/log.jsonl` to
+summarize startup and session lookup timings.
+
 Use `thud --mode=popup` for transient tmux popups. It closes after successfully
 focusing a session or pane. Use `thud --close-on-focus` to enable the same
 behavior in any mode.
@@ -39,6 +45,7 @@ Example tmux binding:
 ```tmux
 bind-key J run-shell 'thud jump'
 bind-key T display-popup -E -w 90% -h 90% 'thud --mode=popup'
+bind-key B display-popup -E -w 90% -h 90% 'THUD_BENCH=1 thud --mode=popup'
 ```
 
 Or run from source:
