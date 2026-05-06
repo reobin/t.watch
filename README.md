@@ -1,87 +1,73 @@
 # thud.sh
 
-A tiny terminal HUD for watching tmux sessions, panes, and agent status.
+A tiny tmux HUD for keeping agent work visible.
 
-It shows running tmux sessions, windows, panes, and optional pane status from integrations such as OpenCode.
+`thud` shows your tmux sessions, windows, panes, and agent status in one terminal view. Leave it open as a monitor, or invoke it for quick actions like jumping to the next pane that needs attention.
 
-## Usage
+## Install
 
-Install globally from npm:
+Requirements:
+
+- [tmux](https://github.com/tmux/tmux/wiki/Installing)
+- [Bun](https://bun.sh/docs/installation)
+
+Install with your package manager:
+
+npm:
 
 ```sh
 npm install -g thud.sh
-thud help
-thud version
-thud
-thud --mode=popup
-thud jump
-thud bench-results
 ```
 
-Inside the HUD, the footer shows `Ctrl+P` for commands and `?` for help. Press
-`?` to open the keyboard shortcut help panel.
+Bun:
 
-Common shortcuts include `j`/`k` or arrows to select sessions, `Tab` to select
-panes within the selected session, `Enter` to focus the selected session or
-pane, `Esc` to leave pane navigation or close a panel, `J` to jump to the next
-agent pane that needs attention, `Ctrl+P` to open the command panel, `m` to
-cycle focus mode, and `q` to quit.
+```sh
+bun add -g thud.sh
+```
 
-`thud jump` focuses the next pane with an integration status in this order:
-`requesting`, `idle`, then `working`. If nothing matches, it exits without
-changing focus.
+pnpm:
 
-Enable benchmark logging with `THUD_BENCH=1`. By default timings are appended to
-`/tmp/thud-sh-bench.jsonl`; set `THUD_BENCH_LOG=/path/to/log.jsonl` to override
-it. Run `thud bench-results` or `thud bench-results /path/to/log.jsonl` to
-summarize startup and session lookup timings.
+```sh
+pnpm add -g thud.sh
+```
 
-Use `thud --mode=popup` for transient tmux popups. It closes after successfully
-focusing a session or pane. Use `thud --close-on-focus` to enable the same
-behavior in any mode.
+## Usage
 
-Example tmux binding:
+```sh
+thud
+```
+
+The app is keyboard-first and explains itself. Press `?` for shortcuts or `Ctrl+P` for commands.
+
+Useful entry points:
+
+```sh
+thud jump
+thud --mode=popup
+thud help
+thud version
+```
+
+Example tmux bindings:
 
 ```tmux
 bind-key J run-shell 'thud jump'
 bind-key T display-popup -E -w 90% -h 90% 'thud --mode=popup'
-bind-key B display-popup -E -w 90% -h 90% 'THUD_BENCH=1 thud --mode=popup'
 ```
 
-Or run from source:
+## OpenCode status integration
+
+To show OpenCode pane status in `thud`:
+
+```sh
+opencode plugin thud.sh
+```
+
+## Development
 
 ```sh
 bun install
 bun run start
-```
-
-Run tests:
-
-```sh
 bun test
-```
-
-Build and inspect the npm package:
-
-```sh
 bun run build
-npm pack --dry-run
-```
-
-Publish a release:
-
-```sh
-npm version patch
-git push
-git push --tags
-```
-
-The pushed version tag triggers GitHub Actions to test, build, pack, and publish the package to npm with provenance.
-
-## OpenCode Integration
-
-Add the plugin so OpenCode can publish its pane status into tmux for `thud.sh` to display:
-
-```sh
-opencode plugin thud.sh
 ```
