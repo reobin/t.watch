@@ -12,6 +12,20 @@ Install globally from npm:
 npm install -g thud.sh
 thud version
 thud
+thud attention
+```
+
+Inside the HUD, press `j`/`k` or arrows to select sessions, `Enter` to focus the
+selected session, `a` to focus the next attention pane, and `q` to quit.
+
+`thud attention` focuses the next pane with an integration status in this order:
+`requesting`, `idle`, then `working`. If nothing matches, it exits without
+changing focus.
+
+Example tmux binding:
+
+```tmux
+bind-key A run-shell 'thud attention'
 ```
 
 Or run from source:

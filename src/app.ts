@@ -16,6 +16,7 @@ import {
   firstSessionId,
   hasSession,
   isAttachedActivePane,
+  nextAttentionPaneId,
   selectNextSession,
   selectPreviousSession,
 } from "./navigation";
@@ -30,7 +31,7 @@ export async function startApp(): Promise<void> {
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let sessionWatcher: TmuxSessionWatcher | undefined;
   let isStartingWatcher = false;
-  let isFocusingSession = false;
+  let isFocusingPane = false;
   let selectedSessionId: string | undefined;
   let currentSessionId: string | undefined;
   let sessions: TmuxSession[] = [];
@@ -89,6 +90,12 @@ export async function startApp(): Promise<void> {
       key.preventDefault();
       selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentSessions();
+      return;
+    }
+
+    if (key.name === "a") {
+      key.preventDefault();
+      void focusAttentionPane();
       return;
     }
 
@@ -217,7 +224,7 @@ export async function startApp(): Promise<void> {
   }
 
   async function focusSelectedSession(): Promise<void> {
-    if (!selectedSessionId || isFocusingSession) {
+    if (!selectedSessionId) {
       return;
     }
 
@@ -227,7 +234,25 @@ export async function startApp(): Promise<void> {
       return;
     }
 
-    isFocusingSession = true;
+    await focusPane(paneId);
+  }
+
+  async function focusAttentionPane(): Promise<void> {
+    const paneId = nextAttentionPaneId(sessions, appPaneId);
+
+    if (!paneId) {
+      return;
+    }
+
+    await focusPane(paneId);
+  }
+
+  async function focusPane(paneId: string): Promise<void> {
+    if (isFocusingPane) {
+      return;
+    }
+
+    isFocusingPane = true;
     try {
       const result = await focusPaneForAllClients(paneId);
 
@@ -238,7 +263,7 @@ export async function startApp(): Promise<void> {
 
       await refreshSessions();
     } finally {
-      isFocusingSession = false;
+      isFocusingPane = false;
     }
   }
 }
