@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, normalize, resolve as resolvePath } from "node:path";
+import { benchAsync, benchNow, createBenchRun, elapsedMs } from "../benchmark";
 import { missingTmuxMessage, runTmux } from "./commands";
 import { gitMetadata } from "./git";
 import type {
@@ -63,16 +64,22 @@ type ClientRecord = {
 };
 
 export async function listSessions(): Promise<TmuxSessionsResult> {
+  const bench = createBenchRun("session_lookup");
+  const timings: Record<string, number> = {};
+
   try {
-    const result = await runTmux(["list-sessions", "-F", sessionFormat]);
+    const result = await benchAsync("listSessionsCommandMs", timings, () =>
+      runTmux(["list-sessions", "-F", sessionFormat]),
+    );
 
     if (result.exitCode === 0) {
       const [windows, panes, clients, processes] = await Promise.all([
-        listWindows(),
-        listPanes(),
-        listClients(),
-        listProcesses(),
+        benchAsync("listWindowsMs", timings, listWindows),
+        benchAsync("listPanesMs", timings, listPanes),
+        benchAsync("listClientsMs", timings, listClients),
+        benchAsync("psMs", timings, listProcesses),
       ]);
+      const processTreeStartedAt = benchNow();
       const processTree = createProcessTree(processes);
       const processesByPid = new Map(
         processes.map((processInfo) => [processInfo.pid, processInfo]),
@@ -80,22 +87,43 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
       const sshAttachedSessions = listSshAttachedSessions(clients, processes);
       const panesByWindow = groupPanesByWindow(panes, processTree, processesByPid);
       const windowsBySession = groupWindowsBySession(windows, panesByWindow);
+      timings.processTreeMs = elapsedMs(processTreeStartedAt);
 
       const sessions = result.stdout
         .trim()
         .split(/\r?\n/)
         .filter(Boolean)
         .map((line) => parseSession(line, windowsBySession, sshAttachedSessions));
+      const sessionsWithMetadata = await benchAsync("gitMetadataMs", timings, () =>
+        withSessionMetadata(sessions),
+      );
+
+      bench.add(timings);
+      bench.log({
+        ok: true,
+        listSessionsMs: bench.elapsed(),
+        sessionCount: sessionsWithMetadata.length,
+      });
 
       return {
         ok: true,
-        sessions: await withSessionMetadata(sessions),
+        sessions: sessionsWithMetadata,
       };
     }
 
     if (isNoSessionsError(result.stderr)) {
+      bench.add(timings);
+      bench.log({ ok: true, listSessionsMs: bench.elapsed(), sessionCount: 0 });
+
       return { ok: true, sessions: [] };
     }
+
+    bench.add(timings);
+    bench.log({
+      ok: false,
+      listSessionsMs: bench.elapsed(),
+      message: result.stderr.trim() || result.stdout.trim(),
+    });
 
     return {
       ok: false,
@@ -103,6 +131,9 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
     };
   } catch (error) {
     if (error instanceof Error && error.message.includes("ENOENT")) {
+      bench.add(timings);
+      bench.log({ ok: false, listSessionsMs: bench.elapsed(), message: missingTmuxMessage });
+
       return { ok: false, message: missingTmuxMessage };
     }
 

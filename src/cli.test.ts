@@ -1,16 +1,20 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runCli } from "./cli";
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const originalTmuxPane = process.env.TMUX_PANE;
 const help = `Usage: thud [--mode=default|popup] [--close-on-focus]
-       thud [help|version|jump]
+       thud [help|version|jump|bench-results [path]]
 
 Commands:
   thud          Start the HUD
   thud help     Show help
   thud version  Print the installed package version
   thud jump     Focus the next pane needing attention
+  thud bench-results  Summarize recorded benchmark results
 
 Options:
   --mode=default     Keep thud open after focusing a target
@@ -99,6 +103,39 @@ describe("runCli", () => {
     expect(startApp).not.toHaveBeenCalled();
     expect(output.log).toHaveBeenCalledWith(help);
     expect(output.error).not.toHaveBeenCalled();
+  });
+
+  test("prints benchmark results summary", async () => {
+    const startApp = mock(async () => {});
+    const output = mockOutput();
+    const directory = mkdtempSync(join(tmpdir(), "thud-bench-"));
+    const path = join(directory, "bench.jsonl");
+
+    try {
+      writeFileSync(
+        path,
+        [
+          JSON.stringify({ event: "startup", firstRenderMs: 120, listSessionsMs: 20 }),
+          JSON.stringify({ event: "startup", firstRenderMs: 180, listSessionsMs: 30 }),
+        ].join("\n"),
+      );
+
+      await expect(runCli(["bun", "thud", "bench-results", path], startApp, output)).resolves.toBe(
+        0,
+      );
+      expect(startApp).not.toHaveBeenCalled();
+      expect(output.log).toHaveBeenCalledWith(
+        [
+          `Benchmark log: ${path}`,
+          "records: 2",
+          "firstRenderMs: count=2 min=120ms p50=120ms p95=180ms max=180ms",
+          "listSessionsMs: count=2 min=20ms p50=20ms p95=30ms max=30ms",
+        ].join("\n"),
+      );
+      expect(output.error).not.toHaveBeenCalled();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   test("rejects unknown args", async () => {
