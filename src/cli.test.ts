@@ -3,13 +3,19 @@ import { runCli } from "./cli";
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const originalTmuxPane = process.env.TMUX_PANE;
-const help = `Usage: thud [help|version|jump]
+const help = `Usage: thud [--mode=default|popup] [--close-on-focus]
+       thud [help|version|jump]
 
 Commands:
   thud          Start the HUD
   thud help     Show help
   thud version  Print the installed package version
-  thud jump     Focus the next pane needing attention`;
+  thud jump     Focus the next pane needing attention
+
+Options:
+  --mode=default     Keep thud open after focusing a target
+  --mode=popup       Close thud after focusing a target
+  --close-on-focus   Close thud after focusing a target`;
 
 beforeEach(() => {
   delete process.env.TMUX_PANE;
@@ -30,9 +36,45 @@ describe("runCli", () => {
     const output = mockOutput();
 
     await expect(runCli(["bun", "thud"], startApp, output)).resolves.toBe(0);
-    expect(startApp).toHaveBeenCalledTimes(1);
+    expect(startApp).toHaveBeenCalledWith({ closeOnFocus: false });
     expect(output.log).not.toHaveBeenCalled();
     expect(output.error).not.toHaveBeenCalled();
+  });
+
+  test("starts the app in default mode", async () => {
+    const startApp = mock(async () => {});
+    const output = mockOutput();
+
+    await expect(runCli(["bun", "thud", "--mode=default"], startApp, output)).resolves.toBe(0);
+    expect(startApp).toHaveBeenCalledWith({ closeOnFocus: false });
+    expect(output.error).not.toHaveBeenCalled();
+  });
+
+  test("starts the app in popup mode", async () => {
+    const startApp = mock(async () => {});
+    const output = mockOutput();
+
+    await expect(runCli(["bun", "thud", "--mode=popup"], startApp, output)).resolves.toBe(0);
+    expect(startApp).toHaveBeenCalledWith({ closeOnFocus: true });
+    expect(output.error).not.toHaveBeenCalled();
+  });
+
+  test("starts the app with close-on-focus", async () => {
+    const startApp = mock(async () => {});
+    const output = mockOutput();
+
+    await expect(runCli(["bun", "thud", "--close-on-focus"], startApp, output)).resolves.toBe(0);
+    expect(startApp).toHaveBeenCalledWith({ closeOnFocus: true });
+    expect(output.error).not.toHaveBeenCalled();
+  });
+
+  test("rejects invalid modes", async () => {
+    const startApp = mock(async () => {});
+    const output = mockOutput();
+
+    await expect(runCli(["bun", "thud", "--mode=panel"], startApp, output)).resolves.toBe(1);
+    expect(startApp).not.toHaveBeenCalled();
+    expect(output.error).toHaveBeenCalledWith(help);
   });
 
   test("prints the package version", async () => {

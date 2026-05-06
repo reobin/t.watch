@@ -34,8 +34,15 @@ const commandPanelMaxWidth = 40;
 const helpPanelMaxWidth = 72;
 const commandPanelHorizontalMargin = 4;
 const commandPanelChromeWidth = 4;
+const defaultModeIndicatorMs = 1000;
 
-export async function startApp(): Promise<void> {
+type AppMode = "default" | "popup";
+
+export type AppOptions = {
+  closeOnFocus?: boolean;
+};
+
+export async function startApp(options: AppOptions = {}): Promise<void> {
   let isDestroyed = false;
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let sessionWatcher: TmuxSessionWatcher | undefined;
@@ -49,6 +56,8 @@ export async function startApp(): Promise<void> {
   let terminalWidth = 0;
   let activePanel: "commands" | "help" | undefined;
   let selectedCommandIndex = 0;
+  let appMode: AppMode = options.closeOnFocus ? "popup" : "default";
+  let defaultModeIndicatorTimer: ReturnType<typeof setTimeout> | undefined;
   const appPaneId = process.env.TMUX_PANE;
 
   const renderer = await createCliRenderer({
@@ -59,6 +68,10 @@ export async function startApp(): Promise<void> {
 
       if (refreshTimer) {
         clearInterval(refreshTimer);
+      }
+
+      if (defaultModeIndicatorTimer) {
+        clearTimeout(defaultModeIndicatorTimer);
       }
 
       void sessionWatcher?.stop();
@@ -83,6 +96,10 @@ export async function startApp(): Promise<void> {
       run: refreshSessions,
     },
     {
+      label: "Cycle mode",
+      run: cycleMode,
+    },
+    {
       label: "Help",
       run: openHelpPanel,
     },
@@ -91,6 +108,7 @@ export async function startApp(): Promise<void> {
       run: () => renderer.destroy(),
     },
   ];
+  syncModeIndicator();
 
   renderer.on("resize", (width) => {
     terminalWidth = width;
@@ -183,6 +201,12 @@ export async function startApp(): Promise<void> {
     if ((key.shift && key.name === "j") || key.name === "J") {
       key.preventDefault();
       void jumpToPane();
+      return;
+    }
+
+    if (key.name === "m") {
+      key.preventDefault();
+      cycleMode();
       return;
     }
 
@@ -394,6 +418,7 @@ export async function startApp(): Promise<void> {
   function isHelpPassthroughKey(key: { name: string; shift: boolean }): boolean {
     return (
       key.name === "q" ||
+      key.name === "m" ||
       key.name === "tab" ||
       key.name === "enter" ||
       key.name === "return" ||
@@ -404,6 +429,35 @@ export async function startApp(): Promise<void> {
       (key.shift && key.name === "j") ||
       key.name === "J"
     );
+  }
+
+  function cycleMode(): void {
+    appMode = appMode === "default" ? "popup" : "default";
+    syncModeIndicator(appMode === "default");
+  }
+
+  function syncModeIndicator(showDefault = false): void {
+    if (defaultModeIndicatorTimer) {
+      clearTimeout(defaultModeIndicatorTimer);
+      defaultModeIndicatorTimer = undefined;
+    }
+
+    if (appMode === "default" && !showDefault) {
+      screen.setModeIndicator(undefined);
+      return;
+    }
+
+    screen.setModeIndicator(appMode);
+
+    if (appMode === "default") {
+      defaultModeIndicatorTimer = setTimeout(() => {
+        defaultModeIndicatorTimer = undefined;
+
+        if (!isDestroyed && appMode === "default") {
+          screen.setModeIndicator(undefined);
+        }
+      }, defaultModeIndicatorMs);
+    }
   }
 
   function closePaneNavigation(): void {
@@ -488,6 +542,11 @@ export async function startApp(): Promise<void> {
 
       if (result.ok === false) {
         screen.setContent(renderMessage(result.message));
+        return;
+      }
+
+      if (appMode === "popup") {
+        renderer.destroy();
         return;
       }
 

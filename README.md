@@ -13,6 +13,7 @@ npm install -g thud.sh
 thud help
 thud version
 thud
+thud --mode=popup
 thud jump
 ```
 
@@ -22,17 +23,22 @@ Inside the HUD, the footer shows `Ctrl+P` for commands and `?` for help. Press
 Common shortcuts include `j`/`k` or arrows to select sessions, `Tab` to select
 panes within the selected session, `Enter` to focus the selected session or
 pane, `Esc` to leave pane navigation or close a panel, `J` to jump to the next
-agent pane that needs attention, `Ctrl+P` to open the command panel, and `q` to
-quit.
+agent pane that needs attention, `Ctrl+P` to open the command panel, `m` to
+cycle focus mode, and `q` to quit.
 
 `thud jump` focuses the next pane with an integration status in this order:
 `requesting`, `idle`, then `working`. If nothing matches, it exits without
 changing focus.
 
+Use `thud --mode=popup` for transient tmux popups. It closes after successfully
+focusing a session or pane. Use `thud --close-on-focus` to enable the same
+behavior in any mode.
+
 Example tmux binding:
 
 ```tmux
 bind-key J run-shell 'thud jump'
+bind-key T display-popup -E -w 90% -h 90% 'thud --mode=popup'
 ```
 
 Or run from source:
