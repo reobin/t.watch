@@ -16,10 +16,14 @@ thud
 thud jump
 ```
 
-Inside the HUD, press `j`/`k` or arrows to select sessions, `Tab` to toggle pane
-navigation within the selected session, `Enter` to focus the selected session or
-pane, `Esc` to leave pane navigation, `J` to jump to the next matching pane,
-`Ctrl+P` to open the command panel, and `q` to quit.
+Inside the HUD, the footer shows `Ctrl+P` for commands and `?` for help. Press
+`?` to open the keyboard shortcut help panel.
+
+Common shortcuts include `j`/`k` or arrows to select sessions, `Tab` to select
+panes within the selected session, `Enter` to focus the selected session or
+pane, `Esc` to leave pane navigation or close a panel, `J` to jump to the next
+agent pane that needs attention, `Ctrl+P` to open the command panel, and `q` to
+quit.
 
 `thud jump` focuses the next pane with an integration status in this order:
 `requesting`, `idle`, then `working`. If nothing matches, it exits without

@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import { RGBA, createTextAttributes } from "@opentui/core";
-import { renderCommandPanel } from "./command-panel";
+import { renderCommandPanel, renderHelpPanel } from "./command-panel";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import type { TmuxSession } from "./tmux";
 
@@ -54,6 +54,47 @@ describe("render", () => {
 
     expect(text).toContain("j/k select\nenter focus\nesc close");
     expect(text.split("\n").every((line) => line.length <= 12)).toBe(true);
+  });
+
+  test("renders a help panel", () => {
+    const output = renderHelpPanel({ width: 68 });
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("Keyboard Shortcuts");
+    expect(text).toContain("\n\n  j/k, up/down  Select sessions, panes, or commands");
+    expect(text).toContain("  tab           Select panes in the selected session");
+    expect(text).toContain("  J             Jump to the next agent pane that needs attention");
+    expect(text).toContain("  ctrl+p        Open commands");
+    expect(text).toContain("  ?             Show this help");
+    expect(text).toContain("esc close");
+    expect(text.split("\n").every((line) => line.length <= 68)).toBe(true);
+  });
+
+  test("renders compact help when narrow", () => {
+    const output = renderHelpPanel({ width: 30 });
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("Keyboard Shortcuts");
+    expect(text).toContain("  j/k    select");
+    expect(text).toContain("  tab    select panes");
+    expect(text).toContain("  J      needs attention");
+    expect(text).toContain("  ^P     commands");
+    expect(text).not.toContain("Select sessions, panes, or commands");
+    expect(text.split("\n").every((line) => line.length <= 30)).toBe(true);
+  });
+
+  test("keeps compact help descriptions when very narrow", () => {
+    const output = renderHelpPanel({ width: 10 });
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("Help");
+    expect(text).toContain("j/k select");
+    expect(text).toContain("tab select");
+    expect(text).toContain("J needs");
+    expect(text).toContain("^P command");
+    expect(text).toContain("\n  attentio");
+    expect(text).not.toContain("\nJ attentio");
+    expect(text.split("\n").every((line) => line.length <= 10)).toBe(true);
   });
 
   test("renders session names", () => {

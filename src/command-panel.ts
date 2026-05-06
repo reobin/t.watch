@@ -31,6 +31,8 @@ export type CommandPanelOverlay = {
 };
 
 const backdropOpacity = 0.35;
+const fullHelpMinWidth = 48;
+const alignedHelpMinWidth = 28;
 
 export function renderCommandPanel(
   commands: CommandPanelItem[],
@@ -60,6 +62,75 @@ export function renderCommandPanel(
   const footerChunks = renderCommandFooter(textMutedFg, theme.width);
 
   chunks.push(textChunk("\n\n"), ...footerChunks);
+
+  return new StyledText(chunks);
+}
+
+export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
+  const textMutedFg = theme.textMutedFg ?? RGBA.fromIndex(palette.gray);
+  const items = [
+    {
+      shortcut: "j/k, up/down",
+      compactShortcut: "j/k",
+      description: "Select sessions, panes, or commands",
+      compactDescription: "select",
+    },
+    {
+      shortcut: "enter",
+      description: "Focus or run the selected item",
+      compactDescription: "focus/run",
+    },
+    {
+      shortcut: "tab",
+      description: "Select panes in the selected session",
+      compactDescription: "select panes",
+    },
+    {
+      shortcut: "esc",
+      description: "Close help, commands, or pane navigation",
+      compactDescription: "close",
+    },
+    {
+      shortcut: "J",
+      description: "Jump to the next agent pane that needs attention",
+      compactDescription: "needs attention",
+    },
+    {
+      shortcut: "ctrl+p",
+      compactShortcut: "^P",
+      description: "Open commands",
+      compactDescription: "commands",
+    },
+    { shortcut: "?", description: "Show this help", compactDescription: "help" },
+    { shortcut: "q", description: "Quit", compactDescription: "quit" },
+  ];
+  const mode = helpPanelMode(theme.width);
+  const title =
+    theme.width !== undefined && theme.width < "Keyboard Shortcuts".length
+      ? "Help"
+      : "Keyboard Shortcuts";
+  const helpItems = items.map((item) => ({
+    shortcut: mode === "full" ? item.shortcut : (item.compactShortcut ?? item.shortcut),
+    description: mode === "full" ? item.description : item.compactDescription,
+  }));
+  const shortcutWidth = Math.max(...helpItems.map((item) => item.shortcut.length));
+  const chunks: TextChunk[] = [...fitLine([active(title)], theme.width), textChunk("\n")];
+
+  helpItems.forEach((item) => {
+    chunks.push(textChunk("\n"));
+
+    chunks.push(
+      ...renderHelpRow(
+        item.shortcut,
+        item.description,
+        mode === "tight" ? item.shortcut.length : shortcutWidth,
+        textMutedFg,
+        theme.width,
+      ),
+    );
+  });
+
+  chunks.push(textChunk("\n\n"), ...renderHelpFooter(textMutedFg, theme.width));
 
   return new StyledText(chunks);
 }
@@ -95,7 +166,7 @@ export function createCommandPanelOverlay(
     height: "100%",
     zIndex: 0,
     opacity: backdropOpacity,
-    backgroundColor: RGBA.fromInts(0, 0, 0),
+    backgroundColor: colors.background,
   });
 
   const panel = new BoxRenderable(renderer, {
@@ -167,6 +238,104 @@ function renderCommandFooter(textMutedFg: RGBA, width: number | undefined): Text
     result.push(...fittedItem);
     lineLength += lineLengthOf(fittedItem);
   });
+
+  return result;
+}
+
+function renderHelpRow(
+  shortcut: string,
+  description: string,
+  shortcutWidth: number,
+  textMutedFg: RGBA,
+  width: number | undefined,
+): TextChunk[] {
+  const prefix = helpRowPrefix(width).text;
+  const gap = width !== undefined && width < alignedHelpMinWidth ? " " : "  ";
+  const rowPrefix = `${prefix}${shortcut.padEnd(shortcutWidth)}${gap}`;
+  const continuationPrefix = " ".repeat(rowPrefix.length);
+
+  if (width === undefined) {
+    return [
+      textChunk(prefix),
+      active(shortcut.padEnd(shortcutWidth)),
+      muted(`${gap}${description}`, textMutedFg),
+    ];
+  }
+
+  const descriptionWidth = width - rowPrefix.length;
+
+  if (descriptionWidth <= 0) {
+    return fitLine([textChunk(prefix), active(shortcut)], width);
+  }
+
+  return wrapWords(description, descriptionWidth).flatMap((line, index) => [
+    ...(index === 0
+      ? [textChunk(prefix), active(shortcut.padEnd(shortcutWidth)), muted(gap, textMutedFg)]
+      : [textChunk("\n"), textChunk(continuationPrefix)]),
+    muted(line, textMutedFg),
+  ]);
+}
+
+function renderHelpFooter(textMutedFg: RGBA, width: number | undefined): TextChunk[] {
+  if (width !== undefined && width < 9) {
+    return fitLine([active("esc")], width);
+  }
+
+  return fitLine([active("esc"), muted(" close", textMutedFg)], width);
+}
+
+function helpPanelMode(width: number | undefined): "full" | "compact" | "tight" {
+  if (width === undefined || width >= fullHelpMinWidth) {
+    return "full";
+  }
+
+  if (width >= alignedHelpMinWidth) {
+    return "compact";
+  }
+
+  return "tight";
+}
+
+function helpRowPrefix(width: number | undefined): TextChunk {
+  return textChunk(width !== undefined && width < alignedHelpMinWidth ? "" : "  ");
+}
+
+function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+
+  for (const word of text.split(" ")) {
+    if (line.length === 0) {
+      line = word;
+      continue;
+    }
+
+    if (line.length + 1 + word.length <= width) {
+      line += ` ${word}`;
+      continue;
+    }
+
+    lines.push(line);
+    line = word;
+  }
+
+  if (line.length > 0) {
+    lines.push(line);
+  }
+
+  return lines.flatMap((line) => splitLongWord(line, width));
+}
+
+function splitLongWord(text: string, width: number): string[] {
+  if (text.length <= width) {
+    return [text];
+  }
+
+  const result: string[] = [];
+
+  for (let index = 0; index < text.length; index += width) {
+    result.push(text.slice(index, index + width));
+  }
 
   return result;
 }
