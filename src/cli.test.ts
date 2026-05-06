@@ -3,6 +3,13 @@ import { runCli } from "./cli";
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const originalTmuxPane = process.env.TMUX_PANE;
+const help = `Usage: thud [help|version|jump]
+
+Commands:
+  thud          Start the HUD
+  thud help     Show help
+  thud version  Print the installed package version
+  thud jump     Focus the next pane needing attention`;
 
 beforeEach(() => {
   delete process.env.TMUX_PANE;
@@ -42,14 +49,24 @@ describe("runCli", () => {
     expect(output.error).not.toHaveBeenCalled();
   });
 
+  test("prints help", async () => {
+    const startApp = mock(async () => {});
+    const output = mockOutput();
+
+    await expect(runCli(["bun", "thud", "help"], startApp, output)).resolves.toBe(0);
+    expect(startApp).not.toHaveBeenCalled();
+    expect(output.log).toHaveBeenCalledWith(help);
+    expect(output.error).not.toHaveBeenCalled();
+  });
+
   test("rejects unknown args", async () => {
     const startApp = mock(async () => {});
     const output = mockOutput();
 
-    await expect(runCli(["bun", "thud", "help"], startApp, output)).resolves.toBe(1);
+    await expect(runCli(["bun", "thud", "unknown"], startApp, output)).resolves.toBe(1);
     expect(startApp).not.toHaveBeenCalled();
     expect(output.log).not.toHaveBeenCalled();
-    expect(output.error).toHaveBeenCalledWith("Usage: thud [version|jump]");
+    expect(output.error).toHaveBeenCalledWith(help);
   });
 
   test("rejects extra args", async () => {
@@ -59,7 +76,7 @@ describe("runCli", () => {
     await expect(runCli(["bun", "thud", "version", "extra"], startApp, output)).resolves.toBe(1);
     expect(startApp).not.toHaveBeenCalled();
     expect(output.log).not.toHaveBeenCalled();
-    expect(output.error).toHaveBeenCalledWith("Usage: thud [version|jump]");
+    expect(output.error).toHaveBeenCalledWith(help);
   });
 
   test("jumps to the next matching pane", async () => {
@@ -145,7 +162,10 @@ describe("runCli", () => {
   test("reports jump session listing failures", async () => {
     const startApp = mock(async () => {});
     const output = mockOutput();
-    const listSessions = mock(async () => ({ ok: false as const, message: "tmux failed" }));
+    const listSessions = mock(async () => ({
+      ok: false as const,
+      message: "tmux failed",
+    }));
     const focusPaneForAllClients = mock(async () => ({ ok: true as const }));
 
     await expect(

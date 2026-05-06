@@ -12,7 +12,13 @@ type TmuxActions = {
   listSessions: typeof listSessions;
 };
 
-const usage = "Usage: thud [version|jump]";
+const help = `Usage: thud [help|version|jump]
+
+Commands:
+  thud          Start the HUD
+  thud help     Show help
+  thud version  Print the installed package version
+  thud jump     Focus the next pane needing attention`;
 const tmuxActions: TmuxActions = {
   focusPaneForAllClients,
   listSessions,
@@ -31,6 +37,11 @@ export async function runCli(
     return 0;
   }
 
+  if (args.length === 1 && args[0] === "help") {
+    output.log(help);
+    return 0;
+  }
+
   if (args.length === 1 && args[0] === "version") {
     output.log(await packageIdentifier());
     return 0;
@@ -40,7 +51,7 @@ export async function runCli(
     return jumpToPane(output, tmux);
   }
 
-  output.error(usage);
+  output.error(help);
   return 1;
 }
 

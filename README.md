@@ -10,6 +10,7 @@ Install globally from npm:
 
 ```sh
 npm install -g thud.sh
+thud help
 thud version
 thud
 thud jump
