@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import { RGBA, createTextAttributes } from "@opentui/core";
+import { renderCommandPanel } from "./command-panel";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import type { TmuxSession } from "./tmux";
 
@@ -15,6 +16,44 @@ describe("render", () => {
 
   test("renders the empty sessions state", () => {
     expect(renderNoSessions()).toBe("No tmux sessions running.");
+  });
+
+  test("renders a command panel", () => {
+    const output = renderCommandPanel([{ label: "Focus session" }, { label: "Quit" }], 1, {
+      width: 36,
+    });
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const selectedCommand = output.chunks.find((chunk) => chunk.text === "Quit");
+    const selectedBorder = output.chunks.find((chunk) => chunk.text === "▎ ");
+
+    expect(text).toContain("Commands");
+    expect(text).toContain("  Focus session");
+    expect(text).toContain("▎ Quit");
+    expect(text).toContain("j/k select  enter focus  esc close");
+    expect(text.split("\n").every((line) => line.length <= 36)).toBe(true);
+    expect(selectedCommand?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(selectedCommand?.bg?.slot).toBe(235);
+    expect(selectedBorder?.fg?.slot).toBe(14);
+  });
+
+  test("fits command panel rows to the content width", () => {
+    const output = renderCommandPanel(
+      [{ label: "Focus selected session", description: "Switch tmux focus" }, { label: "Quit" }],
+      0,
+      { width: 12 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("▎ Focus sel");
+    expect(text.split("\n").every((line) => line.length <= 12)).toBe(true);
+  });
+
+  test("wraps the command panel footer when narrow", () => {
+    const output = renderCommandPanel([{ label: "Refresh" }], 0, { width: 12 });
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("j/k select\nenter focus\nesc close");
+    expect(text.split("\n").every((line) => line.length <= 12)).toBe(true);
   });
 
   test("renders session names", () => {

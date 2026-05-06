@@ -7,6 +7,7 @@ import {
   type TmuxSession,
   type TmuxSessionWatcher,
 } from "./tmux";
+import { renderCommandPanel, type CommandPanelItem } from "./command-panel";
 import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
 import { createScreen } from "./screen";
 import { detectRenderTheme } from "./theme";
@@ -25,6 +26,9 @@ const refreshIntervalMs = 1500;
 const paletteTimeoutMs = 100;
 const enableTerminalFocusReporting = "\x1b[?1004h";
 const disableTerminalFocusReporting = "\x1b[?1004l";
+const commandPanelMaxWidth = 40;
+const commandPanelHorizontalMargin = 4;
+const commandPanelChromeWidth = 4;
 
 export async function startApp(): Promise<void> {
   let isDestroyed = false;
@@ -36,6 +40,8 @@ export async function startApp(): Promise<void> {
   let currentSessionId: string | undefined;
   let sessions: TmuxSession[] = [];
   let terminalWidth = 0;
+  let commandPanelOpen = false;
+  let selectedCommandIndex = 0;
   const appPaneId = process.env.TMUX_PANE;
 
   const renderer = await createCliRenderer({
@@ -56,11 +62,29 @@ export async function startApp(): Promise<void> {
   const renderTheme = await detectRenderTheme(renderer, paletteTimeoutMs);
   const screen = createScreen(renderer, renderLoading(), renderTheme);
   terminalWidth = renderer.width;
+  const commands: (CommandPanelItem & { run: () => void | Promise<void> })[] = [
+    {
+      label: "Focus session",
+      run: focusSelectedSession,
+    },
+    {
+      label: "Jump pane",
+      run: jumpToPane,
+    },
+    {
+      label: "Refresh sessions",
+      run: refreshSessions,
+    },
+    {
+      label: "Quit",
+      run: () => renderer.destroy(),
+    },
+  ];
 
   renderer.on("resize", (width) => {
     terminalWidth = width;
     if (sessions.length > 0) {
-      renderCurrentSessions();
+      renderCurrentView();
     }
   });
 
@@ -69,7 +93,49 @@ export async function startApp(): Promise<void> {
   });
 
   renderer.keyInput.on("keypress", (key) => {
+    if ((key.ctrl || key.meta) && key.name === "p") {
+      key.preventDefault();
+      commandPanelOpen = !commandPanelOpen;
+      screen.setCommandPanelVisible(commandPanelOpen);
+      renderCurrentView();
+      return;
+    }
+
     if (key.ctrl || key.meta) {
+      return;
+    }
+
+    if (commandPanelOpen) {
+      if (key.name === "escape" || key.name === "esc") {
+        key.preventDefault();
+        closeCommandPanel();
+        return;
+      }
+
+      if (key.name === "j" || key.name === "down") {
+        key.preventDefault();
+        selectedCommandIndex = (selectedCommandIndex + 1) % commands.length;
+        renderCommandPanelView();
+        return;
+      }
+
+      if (key.name === "k" || key.name === "up") {
+        key.preventDefault();
+        selectedCommandIndex = (selectedCommandIndex - 1 + commands.length) % commands.length;
+        renderCommandPanelView();
+        return;
+      }
+
+      if (key.name === "enter" || key.name === "return") {
+        key.preventDefault();
+        const command = commands[selectedCommandIndex];
+
+        closeCommandPanel();
+        void command?.run();
+        return;
+      }
+
+      key.preventDefault();
       return;
     }
 
@@ -88,14 +154,14 @@ export async function startApp(): Promise<void> {
     if (key.name === "j" || key.name === "down") {
       key.preventDefault();
       selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
-      renderCurrentSessions();
+      renderCurrentView();
       return;
     }
 
     if (key.name === "k" || key.name === "up") {
       key.preventDefault();
       selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
-      renderCurrentSessions();
+      renderCurrentView();
       return;
     }
 
@@ -192,7 +258,15 @@ export async function startApp(): Promise<void> {
       return;
     }
 
+    renderCurrentView();
+  }
+
+  function renderCurrentView(): void {
     renderCurrentSessions();
+
+    if (commandPanelOpen) {
+      renderCommandPanelView();
+    }
   }
 
   function renderCurrentSessions(): void {
@@ -209,6 +283,28 @@ export async function startApp(): Promise<void> {
     );
   }
 
+  function renderCommandPanelView(): void {
+    const width = commandPanelWidth(terminalWidth);
+    const contentWidth = Math.max(1, width - commandPanelChromeWidth);
+
+    screen.setCommandPanelWidth(width);
+    screen.setCommandPanel(
+      renderCommandPanel(commands, selectedCommandIndex, {
+        ...renderTheme,
+        width: contentWidth,
+      }),
+    );
+  }
+
+  function closeCommandPanel(): void {
+    commandPanelOpen = false;
+    screen.setCommandPanelVisible(false);
+  }
+
+  function commandPanelWidth(width: number): number {
+    return Math.max(1, Math.min(commandPanelMaxWidth, width - commandPanelHorizontalMargin, width));
+  }
+
   function resetSelectedSessionToCurrent(): void {
     const nextSelectedSessionId =
       findCurrentSessionId(sessions, currentSessionId) ??
@@ -220,7 +316,7 @@ export async function startApp(): Promise<void> {
     }
 
     selectedSessionId = nextSelectedSessionId;
-    renderCurrentSessions();
+    renderCurrentView();
   }
 
   async function focusSelectedSession(): Promise<void> {
