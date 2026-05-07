@@ -4,6 +4,7 @@ import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 const statusPalette = {
   red: 1,
   green: 2,
+  brightGreen: 10,
   magenta: 5,
   cyan: 6,
 } as const;
@@ -47,13 +48,10 @@ export function sessionStatusSummary(session: TmuxSession): IntegrationStatusSum
 export function statusCircle(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA): TextChunk {
   switch (status) {
     case "idle":
-      return bold(terminalFg(statusPalette.green, "●"));
     case "running":
-      return bold(terminalFg(statusPalette.cyan, "●"));
     case "waiting":
-      return bold(terminalFg(statusPalette.magenta, "●"));
     case "error":
-      return bold(terminalFg(statusPalette.red, "●"));
+      return bold(fg(statusColor(status, textMutedFg))("●"));
     case "unknown":
       return fg(textMutedFg)("●");
   }
@@ -77,7 +75,7 @@ export function statusLabel(status: TmuxPaneIntegrationStatus): string {
 export function statusColor(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA): RGBA {
   switch (status) {
     case "idle":
-      return RGBA.fromIndex(statusPalette.green);
+      return RGBA.fromIndex(statusPalette.brightGreen);
     case "running":
       return RGBA.fromIndex(statusPalette.cyan);
     case "waiting":
@@ -87,8 +85,4 @@ export function statusColor(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA
     case "unknown":
       return textMutedFg;
   }
-}
-
-function terminalFg(index: number, text: string): TextChunk {
-  return fg(RGBA.fromIndex(index))(text);
 }

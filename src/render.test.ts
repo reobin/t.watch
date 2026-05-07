@@ -195,7 +195,10 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === " running")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === "▎ ")?.fg?.slot).toBe(8);
+    expect(output.chunks.find((chunk) => chunk.text === "▎ ")?.attributes).toBe(
+      createTextAttributes({ bold: true }),
+    );
+    expect(output.chunks.find((chunk) => chunk.text === "▎ ")?.fg?.slot).toBe(6);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "*")?.attributes).toBe(0);
@@ -330,13 +333,173 @@ describe("render", () => {
       "indexed",
       "indexed",
     ]);
-    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([2, 6, 5, 1, 8]);
+    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([10, 6, 5, 1, 8]);
     for (const chunk of markers) {
       expect(chunk.fg).toBeDefined();
     }
   });
 
-  test("uses actionable agent status for the session border only", () => {
+  test("keeps pane status labels muted", () => {
+    const output = renderSessions([
+      session({
+        attached: false,
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "waiting" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const idleLabel = output.chunks.find((chunk) => chunk.text === " idle");
+    const waitingLabel = output.chunks.find((chunk) => chunk.text === " waiting");
+
+    expect(idleLabel?.attributes).toBe(0);
+    expect(idleLabel?.fg?.slot).toBe(8);
+    expect(waitingLabel?.attributes).toBe(0);
+    expect(waitingLabel?.fg?.slot).toBe(8);
+  });
+
+  test("colors unattached session headers when attention is needed", () => {
+    const output = renderSessions([
+      session({
+        attached: false,
+        path: "/repo/work",
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "waiting" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const header = output.chunks.find((chunk) => chunk.text === "/repo/work  default");
+
+    expect(header?.attributes).toBe(0);
+    expect(header?.fg?.slot).toBe(5);
+  });
+
+  test("colors idle session headers like the idle status pill", () => {
+    const output = renderSessions([
+      session({
+        attached: false,
+        path: "/repo/work",
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const header = output.chunks.find((chunk) => chunk.text === "/repo/work  default");
+
+    expect(header?.attributes).toBe(0);
+    expect(header?.fg?.slot).toBe(10);
+  });
+
+  test("uses the session status color for attached session chrome", () => {
+    const output = renderSessions([
+      session({
+        attached: true,
+        path: "/repo/work",
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "waiting" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const header = output.chunks.find((chunk) => chunk.text === "/repo/work  default");
+    const border = output.chunks.find((chunk) => chunk.text === "▎ ");
+
+    expect(header?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(header?.fg?.slot).toBe(5);
+    expect(border?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(border?.fg?.slot).toBe(5);
+  });
+
+  test("uses the selected color for selected session headers and borders", () => {
+    const output = renderSessions(
+      [
+        session({
+          attached: false,
+          path: "/repo/work",
+          windows: [
+            window({
+              panes: [
+                pane({
+                  processName: "opencode",
+                  integration: { tool: "opencode", status: "waiting" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { highlightSelected: true },
+    );
+    const header = output.chunks.find((chunk) => chunk.text === "/repo/work  default");
+    const border = output.chunks.find((chunk) => chunk.text === "╎ ");
+
+    expect(header?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(header?.fg?.slot).toBe(6);
+    expect(border?.fg?.slot).toBe(8);
+    expect(border?.bg?.slot).toBe(235);
+  });
+
+  test("keeps attached pane status labels muted", () => {
+    const output = renderSessions([
+      session({
+        attached: true,
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "waiting" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const idleLabel = output.chunks.find((chunk) => chunk.text === " idle");
+    const waitingLabel = output.chunks.find((chunk) => chunk.text === " waiting");
+
+    expect(idleLabel?.attributes).toBe(0);
+    expect(idleLabel?.fg?.slot).toBe(8);
+    expect(waitingLabel?.attributes).toBe(0);
+    expect(waitingLabel?.fg?.slot).toBe(8);
+  });
+
+  test("keeps unattached session borders muted when attention is needed", () => {
     const output = renderSessions([
       session({
         windows: [
@@ -365,7 +528,7 @@ describe("render", () => {
     expect(text).toContain("╎ default\n╎ ╭─ opencode ● running");
     expect(text).not.toContain("╎ ● waiting");
     expect(text).toContain("╎ ╰─ opencode ● waiting");
-    expect(sessionBorder?.fg?.slot).toBe(5);
+    expect(sessionBorder?.fg?.slot).toBe(8);
   });
 
   test("keeps running-only agent status at the pane level", () => {
@@ -539,6 +702,30 @@ describe("render", () => {
     expect(inactivePaneChunk?.fg).toBeUndefined();
   });
 
+  test("uses the attached session status color for the active pane", () => {
+    const output = renderSessions([
+      session({
+        attached: true,
+        windows: [
+          window({
+            active: true,
+            panes: [
+              pane({
+                processName: "opencode",
+                active: true,
+                integration: { tool: "opencode", status: "idle" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const activePaneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+
+    expect(activePaneChunk?.attributes).toBe(createTextAttributes({ bold: true }));
+    expect(activePaneChunk?.fg?.slot).toBe(10);
+  });
+
   test("renders the selected session as a highlighted block", () => {
     const output = renderSessions(
       [
@@ -699,6 +886,65 @@ describe("render", () => {
     expect(text).toContain("╎ ▶─ bash");
     expect(selectedPaneMarker?.fg?.slot).toBe(14);
     expect(selectedPaneMarker?.bg?.slot).toBe(235);
+    expect(selectedPaneChunk?.bg?.slot).toBe(235);
+  });
+
+  test("uses the attached session status color for selected pane highlighting", () => {
+    const output = renderSessions(
+      [
+        session({
+          attached: true,
+          windows: [
+            window({
+              panes: [
+                pane({
+                  id: "%1",
+                  processName: "opencode",
+                  integration: { tool: "opencode", status: "waiting" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { highlightSelected: true, selectedPaneId: "%1" },
+    );
+    const selectedPaneMarker = output.chunks.find((chunk) => chunk.text === "▶─");
+    const selectedPaneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+
+    expect(selectedPaneMarker?.fg?.slot).toBe(5);
+    expect(selectedPaneMarker?.bg?.slot).toBe(235);
+    expect(selectedPaneChunk?.fg?.slot).toBe(5);
+    expect(selectedPaneChunk?.bg?.slot).toBe(235);
+  });
+
+  test("uses the idle session status color for selected pane highlighting", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({
+                  id: "%1",
+                  processName: "opencode",
+                  integration: { tool: "opencode", status: "idle" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { highlightSelected: true, selectedPaneId: "%1" },
+    );
+    const selectedPaneMarker = output.chunks.find((chunk) => chunk.text === "▶─");
+    const selectedPaneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
+
+    expect(selectedPaneMarker?.fg?.slot).toBe(10);
+    expect(selectedPaneMarker?.bg?.slot).toBe(235);
+    expect(selectedPaneChunk?.fg?.slot).toBe(10);
     expect(selectedPaneChunk?.bg?.slot).toBe(235);
   });
 

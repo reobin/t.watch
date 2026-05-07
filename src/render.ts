@@ -74,12 +74,21 @@ function renderSession(
     ? headerText
     : fitMiddle(headerText, sessionHeaderContentWidth(width));
   const sessionStatus = sessionStatusSummary(session);
-  const chunks: TextChunk[] = [
-    renderSessionHeader(header, session),
-    ...renderSessionMetadata(session, textMutedFg, width),
-  ];
   const isSelectedSession = session.id === selectedSessionId;
   const isHighlightedSession = highlightSelected && isSelectedSession;
+  const sessionAccentFg = sessionStatus
+    ? statusColor(sessionStatus.status, textMutedFg)
+    : RGBA.fromIndex(palette.cyan);
+  const chunks: TextChunk[] = [
+    renderSessionHeader(
+      header,
+      session,
+      isHighlightedSession,
+      sessionStatus?.status,
+      sessionAccentFg,
+    ),
+    ...renderSessionMetadata(session, textMutedFg, width),
+  ];
 
   session.windows.forEach((window) => {
     window.panes.forEach((pane, paneIndex) => {
@@ -87,10 +96,16 @@ function renderSession(
       const branch = windowPaneBranch(window.panes.length, paneIndex);
       const rowChunks = [
         muted("\n", textMutedFg),
-        isSelectedPane ? terminalFg(palette.brightCyan, "▶─") : muted(branch, textMutedFg),
+        isSelectedPane
+          ? fg(sessionStatus ? sessionAccentFg : RGBA.fromIndex(palette.brightCyan))("▶─")
+          : muted(branch, textMutedFg),
         ...renderPaneName(
           pane,
           session.attached && window.active && pane.active,
+          isSelectedPane && sessionStatus ? sessionAccentFg : undefined,
+          session.attached && window.active && pane.active && !session.sshAttached && !pane.ssh
+            ? sessionAccentFg
+            : undefined,
           session.sshAttached,
           textMutedFg,
           paneIndex < window.panes.length - 1,
@@ -106,7 +121,7 @@ function renderSession(
     chunks,
     isHighlightedSession,
     session.attached,
-    sessionStatus?.status,
+    session.attached ? sessionAccentFg : undefined,
     selectedBg,
     textMutedFg,
     width,
@@ -269,24 +284,40 @@ function renderGitStatus(
   ];
 }
 
-function renderSessionHeader(header: string, session: TmuxSession): TextChunk {
+function renderSessionHeader(
+  header: string,
+  session: TmuxSession,
+  isSelected: boolean,
+  sessionStatus: TmuxPaneIntegrationStatus | undefined,
+  sessionAccentFg: RGBA,
+): TextChunk {
   if (session.sshAttached) {
     return bold(terminalFg(palette.magenta, header));
   }
 
-  return session.attached ? active(header) : textChunk(header);
+  if (isSelected) {
+    return session.attached ? bold(fg(sessionAccentFg)(header)) : active(header);
+  }
+
+  if (!session.attached && sessionStatus && isAttentionStatus(sessionStatus)) {
+    return fg(sessionAccentFg)(header);
+  }
+
+  return session.attached ? bold(fg(sessionAccentFg)(header)) : textChunk(header);
 }
 
 function renderPaneName(
   pane: TmuxPane,
   isActive: boolean,
+  selectedPaneFg: RGBA | undefined,
+  activePaneFg: RGBA | undefined,
   isSshAttachedSession: boolean,
   textMutedFg: RGBA,
   hasFollowingPane: boolean,
   width: number | undefined,
 ): TextChunk[] {
   return [
-    renderPaneProcessName(pane, isActive, isSshAttachedSession),
+    renderPaneProcessName(pane, isActive, selectedPaneFg, activePaneFg, isSshAttachedSession),
     ...renderStatusPill(pane, textMutedFg),
     ...renderPaneContext(pane, textMutedFg, hasFollowingPane, width),
   ];
@@ -326,9 +357,19 @@ function opencodeTitle(pane: TmuxPane): string | undefined {
 function renderPaneProcessName(
   pane: TmuxPane,
   isActive: boolean,
+  selectedPaneFg: RGBA | undefined,
+  activePaneFg: RGBA | undefined,
   isSshAttachedSession: boolean,
 ): TextChunk {
   const name = ` ${pane.processName}`;
+
+  if (selectedPaneFg) {
+    return fg(selectedPaneFg)(name);
+  }
+
+  if (isActive && activePaneFg) {
+    return bold(fg(activePaneFg)(name));
+  }
 
   if (isActive && (isSshAttachedSession || pane.ssh)) {
     return bold(terminalFg(palette.magenta, name));
@@ -345,12 +386,15 @@ function renderStatusPill(pane: TmuxPane, textMutedFg: RGBA): TextChunk[] {
   }
 
   const label = integration.label ?? statusLabel(integration.status);
-
   return [
     textChunk(" "),
     statusCircle(integration.status, textMutedFg),
     muted(` ${label}`, textMutedFg),
   ];
+}
+
+function isAttentionStatus(status: TmuxPaneIntegrationStatus): boolean {
+  return status === "idle" || status === "waiting" || status === "error";
 }
 
 function active(text: string): TextChunk {
@@ -368,7 +412,7 @@ function sessionBlock(
   chunks: TextChunk[],
   isSelected: boolean,
   isAttached: boolean,
-  sessionStatus: TmuxPaneIntegrationStatus | undefined,
+  sessionAccentFg: RGBA | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
   width: number | undefined,
@@ -404,7 +448,7 @@ function sessionBlock(
   return result;
 
   function startLine(): void {
-    result.push(sessionBorder(isSelected, isAttached, sessionStatus, selectedBg, textMutedFg));
+    result.push(sessionBorder(isSelected, isAttached, sessionAccentFg, selectedBg, textMutedFg));
     lineLength = 2;
   }
 
@@ -420,17 +464,19 @@ function sessionBlock(
 function sessionBorder(
   isSelected: boolean,
   isAttached: boolean,
-  sessionStatus: TmuxPaneIntegrationStatus | undefined,
+  sessionAccentFg: RGBA | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
 ): TextChunk {
-  const statusFg = sessionStatus ? statusColor(sessionStatus, textMutedFg) : undefined;
-  const chunk = {
-    __isChunk: true,
-    text: isAttached ? "▎ " : "╎ ",
-    attributes: 0,
-    fg: statusFg ?? textMutedFg,
-  } satisfies TextChunk;
+  const borderFg = isAttached ? (sessionAccentFg ?? RGBA.fromIndex(palette.cyan)) : textMutedFg;
+  const chunk = isAttached
+    ? bold(fg(borderFg)("▎ "))
+    : ({
+        __isChunk: true,
+        text: "╎ ",
+        attributes: 0,
+        fg: textMutedFg,
+      } satisfies TextChunk);
 
   return isSelected ? selected(chunk, selectedBg) : chunk;
 }
