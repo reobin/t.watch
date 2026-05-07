@@ -52,6 +52,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let selectedSessionId: string | undefined;
   let currentSessionId: string | undefined;
   let selectedPaneId: string | undefined;
+  let sessionNavigationOpen = false;
   let paneNavigationOpen = false;
   let sessions: TmuxSession[] = [];
   let terminalWidth = 0;
@@ -255,8 +256,20 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       }
     }
 
+    if ((key.name === "escape" || key.name === "esc") && sessionNavigationOpen) {
+      key.preventDefault();
+      resetSelectedSessionToCurrent();
+      return;
+    }
+
     if (key.name === "j" || key.name === "down") {
       key.preventDefault();
+      if (!sessionNavigationOpen) {
+        openSessionNavigation();
+        return;
+      }
+
+      sessionNavigationOpen = true;
       selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentView();
       return;
@@ -264,6 +277,12 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
     if (key.name === "k" || key.name === "up") {
       key.preventDefault();
+      if (!sessionNavigationOpen) {
+        openSessionNavigation();
+        return;
+      }
+
+      sessionNavigationOpen = true;
       selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
       renderCurrentView();
       return;
@@ -384,6 +403,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       appPaneLostTmuxFocus
     ) {
       selectedSessionId = nextCurrentSessionId;
+      closeSessionNavigation();
     }
     currentSessionId = nextCurrentSessionId;
     syncSelectedPane();
@@ -416,6 +436,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     screen.setContent(
       renderSessions(sessions, selectedSessionId, {
         ...renderTheme,
+        highlightSelected: sessionNavigationOpen || paneNavigationOpen,
         selectedPaneId: paneNavigationOpen ? selectedPaneId : undefined,
         width: terminalWidth,
       }),
@@ -504,6 +525,18 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     selectedPaneId = undefined;
   }
 
+  function closeSessionNavigation(): void {
+    sessionNavigationOpen = false;
+  }
+
+  function openSessionNavigation(): void {
+    closePaneNavigation();
+    sessionNavigationOpen = true;
+    selectedSessionId = findCurrentSessionId(sessions, currentSessionId);
+    syncSelectedPane();
+    renderCurrentView();
+  }
+
   function togglePaneNavigation(): void {
     if (paneNavigationOpen) {
       closePaneNavigation();
@@ -512,6 +545,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     }
 
     paneNavigationOpen = true;
+    closeSessionNavigation();
     selectedPaneId = findActivePaneId(selectedSession());
     renderCurrentView();
   }
@@ -525,8 +559,15 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       findCurrentSessionId(sessions, currentSessionId) ??
       findCurrentSessionId(sessions, undefined) ??
       firstSessionId(sessions);
+    const wasSessionNavigationOpen = sessionNavigationOpen;
+
+    closeSessionNavigation();
 
     if (selectedSessionId === nextSelectedSessionId) {
+      if (wasSessionNavigationOpen) {
+        renderCurrentView();
+      }
+
       return;
     }
 
@@ -546,6 +587,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       return;
     }
 
+    closeSessionNavigation();
     await focusPane(paneId);
   }
 
@@ -557,6 +599,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     const paneId = selectedPaneId;
 
     closePaneNavigation();
+    closeSessionNavigation();
     await focusPane(paneId);
   }
 
