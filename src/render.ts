@@ -1,12 +1,6 @@
 import { homedir } from "node:os";
 import { RGBA, StyledText, bold, fg, type TextChunk } from "@opentui/core";
-import {
-  sessionStatusSummary,
-  statusCircle,
-  statusColor,
-  statusLabel,
-  type IntegrationStatusSummary,
-} from "./integration-status";
+import { sessionStatusSummary, statusCircle, statusColor, statusLabel } from "./integration-status";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const palette = {
@@ -82,7 +76,6 @@ function renderSession(
   const sessionStatus = sessionStatusSummary(session);
   const chunks: TextChunk[] = [
     renderSessionHeader(header, session),
-    ...renderSessionStatus(sessionStatus, textMutedFg, width),
     ...renderSessionMetadata(session, textMutedFg, width),
   ];
   const isSelectedSession = session.id === selectedSessionId;
@@ -130,37 +123,12 @@ function renderSessionMetadata(
   return metadata ? renderGitStatus(metadata, session.gitDirty, textMutedFg) : [];
 }
 
-function renderSessionStatus(
-  summary: IntegrationStatusSummary | undefined,
-  textMutedFg: RGBA,
-  width: number | undefined,
-): TextChunk[] {
-  if (!summary) {
-    return [];
-  }
-
-  const label =
-    summary.count > 1
-      ? `${summary.count} ${statusLabel(summary.status)}`
-      : statusLabel(summary.status);
-
-  return [
-    muted("\n", textMutedFg),
-    statusCircle(summary.status, textMutedFg),
-    muted(` ${fitEnd(label, sessionStatusLabelContentWidth(width))}`, textMutedFg),
-  ];
-}
-
 function sessionHeaderContentWidth(width: number | undefined): number | undefined {
   return rowContentWidth(width, 0);
 }
 
 function metadataContentWidth(width: number | undefined): number | undefined {
   return rowContentWidth(width, 0);
-}
-
-function sessionStatusLabelContentWidth(width: number | undefined): number | undefined {
-  return rowContentWidth(width, 2);
 }
 
 function rowContentWidth(
