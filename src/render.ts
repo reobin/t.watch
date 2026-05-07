@@ -345,9 +345,9 @@ function statusCircle(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA): Tex
   switch (status) {
     case "idle":
       return bold(terminalFg(palette.green, "●"));
-    case "working":
+    case "running":
       return bold(terminalFg(palette.cyan, "●"));
-    case "requesting":
+    case "waiting":
       return bold(terminalFg(palette.magenta, "●"));
     case "error":
       return bold(terminalFg(palette.red, "●"));
@@ -360,10 +360,10 @@ function statusLabel(status: TmuxPaneIntegrationStatus): string {
   switch (status) {
     case "idle":
       return "idle";
-    case "working":
-      return "working";
-    case "requesting":
-      return "requesting";
+    case "running":
+      return "running";
+    case "waiting":
+      return "waiting";
     case "error":
       return "error";
     case "unknown":

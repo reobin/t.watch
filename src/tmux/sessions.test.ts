@@ -37,7 +37,7 @@ describe("listSessions", () => {
               "10",
               "OC | Coding",
               "opencode",
-              "requesting",
+              "waiting",
               "",
               "1700000110",
             ].join("\x1f"),
@@ -91,7 +91,7 @@ describe("listSessions", () => {
                   ssh: false,
                   integration: {
                     tool: "opencode",
-                    status: "requesting",
+                    status: "waiting",
                     updatedAt: new Date(1700000110 * 1000),
                   },
                 },
