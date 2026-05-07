@@ -108,7 +108,7 @@ export async function watchSessions(
     refreshTimeout = setTimeout(() => {
       refreshTimeout = undefined;
       void onChange();
-    }, 75);
+    }, 0);
   };
 
   const cleanup = async () => {

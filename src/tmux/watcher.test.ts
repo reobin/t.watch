@@ -52,6 +52,77 @@ describe("watchSessions", () => {
     expect(calls).toEqual([...installHookCalls(), waitForCall(), ...unsetHookCalls()]);
   });
 
+  test("schedules refresh after a tmux hook signal", async () => {
+    const wait = deferred<number>();
+    const nextWait = deferred<number>();
+    const calls: string[][] = [];
+    const onChange = mock();
+    let waitCount = 0;
+
+    spyOn(Bun, "spawn").mockImplementation((command) => {
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
+
+      if (args[1] === "wait-for") {
+        waitCount += 1;
+
+        return processResult({ exited: waitCount === 1 ? wait.promise : nextWait.promise });
+      }
+
+      return processResult({ exited: Promise.resolve(0) });
+    });
+
+    const result = await watchSessions(onChange);
+
+    expect(result.ok).toBe(true);
+
+    wait.resolve(0);
+    await Promise.resolve();
+
+    expect(onChange).not.toHaveBeenCalled();
+
+    await waitForMicrotasks();
+    await waitForMicrotasks();
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    if (result.ok === true) {
+      await result.watcher.stop();
+    }
+  });
+
+  test("coalesces quick tmux hook signals into one refresh", async () => {
+    const wait = deferred<number>();
+    const calls: string[][] = [];
+    const onChange = mock();
+    let waitCount = 0;
+
+    spyOn(Bun, "spawn").mockImplementation((command) => {
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
+
+      if (args[1] === "wait-for") {
+        waitCount += 1;
+
+        return processResult({ exited: waitCount <= 2 ? Promise.resolve(0) : wait.promise });
+      }
+
+      return processResult({ exited: Promise.resolve(0) });
+    });
+
+    const result = await watchSessions(onChange);
+
+    expect(result.ok).toBe(true);
+    await waitForMicrotasks();
+    await waitForMicrotasks();
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    if (result.ok === true) {
+      await result.watcher.stop();
+    }
+  });
+
   test("installs a client focus-out hook when requested", async () => {
     const wait = deferred<number>();
     const focusOutWait = deferred<number>();

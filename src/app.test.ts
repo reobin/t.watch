@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hasTickingStatus } from "./app";
+import { focusSessionsOptimistically, hasTickingStatus } from "./app";
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 describe("app", () => {
@@ -26,43 +26,93 @@ describe("app", () => {
     ).toBe(false);
     expect(hasTickingStatus([session()])).toBe(false);
   });
+
+  test("optimistically focuses a target pane without clearing other attached sessions", () => {
+    const otherSession = session({ id: "$1", paneId: "%1", attached: true, active: true });
+    const targetSession = session({
+      id: "$2",
+      paneId: "%2",
+      siblingPaneId: "%3",
+      attached: false,
+      active: false,
+      siblingActive: true,
+    });
+
+    const result = focusSessionsOptimistically([otherSession, targetSession], "%2");
+
+    expect(result.sessionId).toBe("$2");
+    expect(result.sessions[0]?.attached).toBe(true);
+    expect(result.sessions[0]?.windows[0]?.panes[0]?.active).toBe(true);
+    expect(result.sessions[1]?.attached).toBe(true);
+    expect(result.sessions[1]?.windows[0]?.active).toBe(true);
+    expect(result.sessions[1]?.windows[0]?.panes[0]?.active).toBe(true);
+    expect(result.sessions[1]?.windows[0]?.panes[1]?.active).toBe(false);
+  });
+
+  test("leaves sessions unchanged when optimistic focus target is missing", () => {
+    const sessions = [session({ id: "$1", paneId: "%1" })];
+
+    expect(focusSessionsOptimistically(sessions, "%9")).toEqual({ sessions });
+  });
 });
 
 function session(
-  integration: { status?: TmuxPaneIntegrationStatus; updatedAt?: Date } = {},
+  options: {
+    active?: boolean;
+    attached?: boolean;
+    id?: string;
+    paneId?: string;
+    siblingActive?: boolean;
+    siblingPaneId?: string;
+    status?: TmuxPaneIntegrationStatus;
+    updatedAt?: Date;
+  } = {},
 ): TmuxSession {
   return {
-    id: "$1",
+    id: options.id ?? "$1",
     name: "default",
     windows: [
       {
         id: "@1",
         index: 1,
         name: "default",
-        active: true,
+        active: options.active ?? true,
         panes: [
           {
-            id: "%1",
+            id: options.paneId ?? "%1",
             index: 1,
-            active: true,
+            active: options.active ?? true,
             command: "bash",
             title: "bash",
             processName: "bash",
             ssh: false,
-            ...(integration.status
+            ...(options.status
               ? {
                   integration: {
                     tool: "opencode",
-                    status: integration.status,
-                    ...(integration.updatedAt ? { updatedAt: integration.updatedAt } : {}),
+                    status: options.status,
+                    ...(options.updatedAt ? { updatedAt: options.updatedAt } : {}),
                   },
                 }
               : {}),
           },
+          ...(options.siblingPaneId
+            ? [
+                {
+                  id: options.siblingPaneId,
+                  index: 2,
+                  active: options.siblingActive ?? false,
+                  command: "bash",
+                  title: "bash",
+                  processName: "bash",
+                  ssh: false,
+                },
+              ]
+            : []),
         ],
       },
     ],
-    attached: false,
+    attached: options.attached ?? false,
     sshAttached: false,
     createdAt: new Date(0),
     activityAt: new Date(0),

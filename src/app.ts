@@ -769,6 +769,15 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
         return;
       }
 
+      const optimistic = focusSessionsOptimistically(sessions, paneId);
+      if (optimistic.sessionId) {
+        sessions = optimistic.sessions;
+        selectedSessionId = optimistic.sessionId;
+        currentSessionId = optimistic.sessionId;
+        syncSelectedPane();
+        renderCurrentView();
+      }
+
       await refreshSessions();
     } finally {
       isFocusingPane = false;
@@ -802,4 +811,41 @@ export function hasTickingStatus(sessions: TmuxSession[]): boolean {
       ),
     ),
   );
+}
+
+export function focusSessionsOptimistically(
+  sessions: TmuxSession[],
+  paneId: string,
+): { sessions: TmuxSession[]; sessionId?: string } {
+  const targetSession = sessions.find((session) => hasPane(session, paneId));
+
+  if (!targetSession) {
+    return { sessions };
+  }
+
+  return {
+    sessionId: targetSession.id,
+    sessions: sessions.map((session) => {
+      if (session.id !== targetSession.id) {
+        return session;
+      }
+
+      return {
+        ...session,
+        attached: true,
+        windows: session.windows.map((window) => {
+          const hasTargetPane = window.panes.some((pane) => pane.id === paneId);
+
+          return {
+            ...window,
+            active: hasTargetPane,
+            panes: window.panes.map((pane) => ({
+              ...pane,
+              active: hasTargetPane && pane.id === paneId,
+            })),
+          };
+        }),
+      };
+    }),
+  };
 }
