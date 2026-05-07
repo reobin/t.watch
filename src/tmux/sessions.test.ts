@@ -589,6 +589,38 @@ describe("listSessions", () => {
     });
   });
 
+  test("ignores integration status without a tool", async () => {
+    mockSinglePaneTmux({
+      pane: [
+        "$1",
+        "@1",
+        "%1",
+        "1",
+        "1",
+        "node",
+        "10",
+        "OC | Coding",
+        "",
+        "waiting",
+        "",
+        "1700000110",
+        "/repo/work",
+      ],
+      process: "100 10 node node /home/reobin/.local/bin/opencode",
+    });
+
+    const result = await listSessions();
+
+    expect(result).toMatchObject({
+      ok: true,
+      sessions: [{ windows: [{ panes: [{ id: "%1" }] }] }],
+    });
+
+    if (result.ok) {
+      expect(result.sessions[0]?.windows[0]?.panes[0]?.integration).toBeUndefined();
+    }
+  });
+
   test("uses the tmux foreground command as the pane name", async () => {
     mockTmux({
       results: [

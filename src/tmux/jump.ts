@@ -14,6 +14,7 @@ const paneFormat = [
   "#{pane_active}",
   "#{window_active}",
   "#{session_attached}",
+  "#{@thud_sh_tool}",
   "#{@thud_sh_status}",
 ].join(fieldSeparator);
 
@@ -125,18 +126,25 @@ async function listJumpPanes(): Promise<JumpPaneListResult> {
 }
 
 function parseJumpPane(line: string): JumpPane {
-  const [id, active, windowActive, sessionAttached, status] = line.split(fieldSeparator);
+  const [id, active, windowActive, sessionAttached, tool, status] = line.split(fieldSeparator);
 
   return {
     id: id ?? "",
     active: Number(active) > 0,
     windowActive: Number(windowActive) > 0,
     sessionAttached: Number(sessionAttached) > 0,
-    status: parseJumpStatus(status),
+    status: parseJumpStatus(tool, status),
   };
 }
 
-function parseJumpStatus(status: string | undefined): TmuxPaneIntegrationStatus | undefined {
+function parseJumpStatus(
+  tool: string | undefined,
+  status: string | undefined,
+): TmuxPaneIntegrationStatus | undefined {
+  if (!tool) {
+    return undefined;
+  }
+
   if (status === "idle" || status === "running" || status === "waiting") {
     return status;
   }

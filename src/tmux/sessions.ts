@@ -284,16 +284,15 @@ function parsePaneIntegration(
   label: string | undefined,
   updatedAt: string | undefined,
 ): PaneRecord["integration"] {
-  const parsedStatus = parsePaneIntegrationStatus(status);
-
-  if (!tool && !parsedStatus) {
+  if (!tool) {
     return undefined;
   }
 
+  const parsedStatus = parsePaneIntegrationStatus(status);
   const timestamp = Number(updatedAt);
 
   return {
-    tool: tool || "unknown",
+    tool,
     status: parsedStatus ?? "unknown",
     label: label || undefined,
     updatedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp * 1000) : undefined,

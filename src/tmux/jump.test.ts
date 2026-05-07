@@ -8,6 +8,7 @@ const paneFormat = [
   "#{pane_active}",
   "#{window_active}",
   "#{session_attached}",
+  "#{@thud_sh_tool}",
   "#{@thud_sh_status}",
 ].join(separator);
 const clientFormat = ["#{client_name}", "#{client_tty}"].join(separator);
@@ -66,14 +67,55 @@ describe("jumpToNextPane", () => {
       ["tmux", "switch-client", "-c", "client-a", "-t", "%2"],
     ]);
   });
+
+  test("ignores panes with status but no integration tool", async () => {
+    delete process.env.TMUX_PANE;
+    const calls = mockTmuxResults([
+      {
+        exitCode: 0,
+        stdout: paneLines([
+          ["%1", true, true, true],
+          ["%2", false, true, true, "waiting", ""],
+        ]),
+      },
+    ]);
+
+    await expect(jumpToNextPane("%1")).resolves.toEqual({ ok: true });
+    expect(calls).toEqual([["tmux", "list-panes", "-a", "-F", paneFormat]]);
+  });
+
+  test("supports any integration tool", async () => {
+    delete process.env.TMUX_PANE;
+    const calls = mockTmuxResults([
+      {
+        exitCode: 0,
+        stdout: paneLines([
+          ["%1", true, true, true],
+          ["%2", false, true, true, "waiting", "codex"],
+        ]),
+      },
+      { exitCode: 0 },
+    ]);
+
+    await expect(jumpToNextPane("%1")).resolves.toEqual({ ok: true });
+    expect(calls).toEqual([
+      ["tmux", "list-panes", "-a", "-F", paneFormat],
+      ["tmux", "switch-client", "-t", "%2"],
+    ]);
+  });
 });
 
-function paneLines(panes: [string, boolean, boolean, boolean, string?][]): string {
+function paneLines(panes: [string, boolean, boolean, boolean, string?, string?][]): string {
   return `${panes
-    .map(([id, active, windowActive, sessionAttached, status]) =>
-      [id, Number(active), Number(windowActive), Number(sessionAttached), status ?? ""].join(
-        separator,
-      ),
+    .map(([id, active, windowActive, sessionAttached, status, tool]) =>
+      [
+        id,
+        Number(active),
+        Number(windowActive),
+        Number(sessionAttached),
+        tool ?? (status ? "opencode" : ""),
+        status ?? "",
+      ].join(separator),
     )
     .join("\n")}\n`;
 }
