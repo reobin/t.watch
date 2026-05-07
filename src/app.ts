@@ -60,6 +60,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let selectedCommandIndex = 0;
   let appMode: AppMode = options.closeOnFocus ? "popup" : "default";
   let defaultModeIndicatorTimer: ReturnType<typeof setTimeout> | undefined;
+  let suspendHandlerRegistered = false;
   const appPaneId = process.env.TMUX_PANE;
   const startupBench = createBenchRun("startup", {
     mode: appMode,
@@ -72,6 +73,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     exitOnCtrlC: true,
     onDestroy: () => {
       isDestroyed = true;
+      removeSuspendHandler();
+      process.off("SIGCONT", handleResume);
       process.stdout.write(disableTerminalFocusReporting);
 
       if (refreshTimer) {
@@ -86,6 +89,9 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     },
   });
   startupBench.add({ rendererMs: elapsedMs(rendererStartedAt) });
+
+  addSuspendHandler();
+  process.on("SIGCONT", handleResume);
 
   process.stdout.write(enableTerminalFocusReporting);
   const themeStartedAt = benchNow();
@@ -327,6 +333,36 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
     await ensureSessionWatcher();
     watcherBench.log({ watcherMs: watcherBench.elapsed(), ok: Boolean(sessionWatcher) });
+  }
+
+  function addSuspendHandler(): void {
+    if (suspendHandlerRegistered) {
+      return;
+    }
+
+    process.on("SIGTSTP", handleSuspend);
+    suspendHandlerRegistered = true;
+  }
+
+  function removeSuspendHandler(): void {
+    if (!suspendHandlerRegistered) {
+      return;
+    }
+
+    process.off("SIGTSTP", handleSuspend);
+    suspendHandlerRegistered = false;
+  }
+
+  function handleSuspend(): void {
+    removeSuspendHandler();
+    renderer.suspend();
+    process.kill(process.pid, "SIGTSTP");
+  }
+
+  function handleResume(): void {
+    addSuspendHandler();
+    renderer.resume();
+    renderCurrentView();
   }
 
   async function ensureSessionWatcher(): Promise<void> {
