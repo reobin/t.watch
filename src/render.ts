@@ -16,6 +16,7 @@ const rowLeftGutterWidth = 2;
 const rowRightGutterWidth = 2;
 
 export type RenderTheme = {
+  highlightSelected?: boolean;
   selectedBg?: RGBA;
   selectedPaneId?: string;
   textMutedFg?: RGBA;
@@ -44,10 +45,11 @@ export function renderSessions(
 
   return new StyledText(
     sessions.flatMap((session, index) => [
-      textChunk(index === 0 ? "" : "\n"),
+      textChunk(index === 0 ? "" : "\n\n"),
       ...renderSession(
         session,
         selectedSessionId,
+        theme.highlightSelected === true,
         theme.selectedPaneId,
         selectedBg,
         textMutedFg,
@@ -60,6 +62,7 @@ export function renderSessions(
 function renderSession(
   session: TmuxSession,
   selectedSessionId: string | undefined,
+  highlightSelected: boolean,
   selectedPaneId: string | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
@@ -76,6 +79,7 @@ function renderSession(
     ...renderSessionMetadata(session, textMutedFg, width),
   ];
   const isSelectedSession = session.id === selectedSessionId;
+  const isHighlightedSession = highlightSelected && isSelectedSession;
 
   session.windows.forEach((window) => {
     window.panes.forEach((pane, paneIndex) => {
@@ -98,7 +102,14 @@ function renderSession(
     });
   });
 
-  return sessionBlock(chunks, isSelectedSession, selectedBg, width);
+  return sessionBlock(
+    chunks,
+    isHighlightedSession,
+    session.attached,
+    selectedBg,
+    textMutedFg,
+    width,
+  );
 }
 
 function renderSessionMetadata(
@@ -385,7 +396,9 @@ function selected(chunk: TextChunk, selectedBg: RGBA): TextChunk {
 function sessionBlock(
   chunks: TextChunk[],
   isSelected: boolean,
+  isAttached: boolean,
   selectedBg: RGBA,
+  textMutedFg: RGBA,
   width: number | undefined,
 ): TextChunk[] {
   const result: TextChunk[] = [];
@@ -419,7 +432,7 @@ function sessionBlock(
   return result;
 
   function startLine(): void {
-    result.push(sessionBorder(isSelected, selectedBg));
+    result.push(sessionBorder(isSelected, isAttached, selectedBg, textMutedFg));
     lineLength = 2;
   }
 
@@ -432,12 +445,17 @@ function sessionBlock(
   }
 }
 
-function sessionBorder(isSelected: boolean, selectedBg: RGBA): TextChunk {
+function sessionBorder(
+  isSelected: boolean,
+  isAttached: boolean,
+  selectedBg: RGBA,
+  textMutedFg: RGBA,
+): TextChunk {
   const chunk = {
     __isChunk: true,
-    text: isSelected ? "▎ " : "  ",
+    text: isAttached ? "▎ " : "╎ ",
     attributes: 0,
-    ...(isSelected ? { fg: RGBA.fromIndex(palette.brightCyan) } : {}),
+    fg: isAttached ? RGBA.fromIndex(palette.brightCyan) : textMutedFg,
   } satisfies TextChunk;
 
   return isSelected ? selected(chunk, selectedBg) : chunk;

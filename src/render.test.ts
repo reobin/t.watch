@@ -167,13 +167,14 @@ describe("render", () => {
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
       [
-        "  /repo/work  work",
-        "  main*",
-        "  ╭─ opencode ● running",
-        "  ╰─ bash",
-        "  ╶─ bun",
-        "  notes <ssh>",
-        "  ╶─ vim",
+        "▎ /repo/work  work",
+        "▎ main*",
+        "▎ ╭─ opencode ● running",
+        "▎ ╰─ bash",
+        "▎ ╶─ bun",
+        "",
+        "▎ notes <ssh>",
+        "▎ ╶─ vim",
       ].join("\n"),
     );
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.attributes).toBe(
@@ -194,6 +195,7 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === " running")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg?.slot).toBe(6);
+    expect(output.chunks.find((chunk) => chunk.text === "▎ ")?.fg?.slot).toBe(14);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "*")?.attributes).toBe(0);
@@ -217,7 +219,7 @@ describe("render", () => {
     ]);
 
     expect(output.chunks.map((chunk) => chunk.text).join("")).toBe(
-      ["  ~/dev/thud.sh  session", "  main", "  ╶─ bash"].join("\n"),
+      ["╎ ~/dev/thud.sh  session", "╎ main", "╎ ╶─ bash"].join("\n"),
     );
   });
 
@@ -231,13 +233,13 @@ describe("render", () => {
         }),
       ],
       "$1",
-      { width: 32 },
+      { highlightSelected: true, width: 32 },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("▎ ~/dev/t.../feedback  default  ");
-    expect(text).toContain("▎ feat/feedback");
-    expect(text).toContain("▎ ╶─ opencode");
+    expect(text).toContain("╎ ~/dev/t.../feedback  default  ");
+    expect(text).toContain("╎ feat/feedback");
+    expect(text).toContain("╎ ╶─ opencode");
     expect(text.split("\n").every((line) => line.length <= 32)).toBe(true);
   });
 
@@ -251,11 +253,11 @@ describe("render", () => {
         }),
       ],
       "$1",
-      { width: 25 },
+      { highlightSelected: true, width: 25 },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("▎ ~   very-long-session  ");
+    expect(text).toContain("╎ ~   very-long-session  ");
     expect(text).not.toContain("very...ion");
     expect(text.split("\n").every((line) => line.length <= 25)).toBe(true);
   });
@@ -270,13 +272,13 @@ describe("render", () => {
         }),
       ],
       "$1",
-      { width: 28 },
+      { highlightSelected: true, width: 28 },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("▎ tpg/admin~f...ck-session  ");
-    expect(text).toContain("▎ feat/very-l...ack-branch  ");
-    expect(text).toContain("▎ ╶─ opencode");
+    expect(text).toContain("╎ tpg/admin~f...ck-session  ");
+    expect(text).toContain("╎ feat/very-l...ack-branch  ");
+    expect(text).toContain("╎ ╶─ opencode");
     expect(text.split("\n").every((line) => line.length <= 28)).toBe(true);
   });
 
@@ -352,7 +354,7 @@ describe("render", () => {
     ]);
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("opencode ● running\n     Session data and metadata layout");
+    expect(text).toContain("opencode ● running\n╎    Session data and metadata layout");
     expect(
       output.chunks.find((chunk) => chunk.text === "   Session data and metadata layout")?.fg?.slot,
     ).toBe(8);
@@ -384,9 +386,9 @@ describe("render", () => {
     ]);
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("├─ opencode ● idle\n  │  Code review workflow in progress");
-    expect(text).toContain("╰─ opencode ● idle\n     Light mode terminal color palette");
-    expect(text).not.toContain("╰─ opencode ● idle\n  │  Light mode terminal color palette");
+    expect(text).toContain("├─ opencode ● idle\n╎ │  Code review workflow in progress");
+    expect(text).toContain("╰─ opencode ● idle\n╎    Light mode terminal color palette");
+    expect(text).not.toContain("╰─ opencode ● idle\n╎ │  Light mode terminal color palette");
   });
 
   test("continues OpenCode pane context guides for selected panes with following panes", () => {
@@ -409,12 +411,12 @@ describe("render", () => {
         }),
       ],
       "$1",
-      { selectedPaneId: "%1" },
+      { highlightSelected: true, selectedPaneId: "%1" },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const contextChunk = output.chunks.find((chunk) => chunk.text === "│  Selected pane context");
 
-    expect(text).toContain("▎ ▶─ opencode ● running\n▎ │  Selected pane context");
+    expect(text).toContain("╎ ▶─ opencode ● running\n╎ │  Selected pane context");
     expect(contextChunk?.bg?.slot).toBe(235);
   });
 
@@ -436,11 +438,11 @@ describe("render", () => {
         }),
       ],
       "$1",
-      { width: 32 },
+      { highlightSelected: true, width: 32 },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("▎    Helium dotfiles and sw...  ");
+    expect(text).toContain("╎    Helium dotfiles and sw...  ");
     expect(text.split("\n").every((line) => line.length <= 32)).toBe(true);
   });
 
@@ -500,17 +502,18 @@ describe("render", () => {
         }),
       ],
       "$1",
+      { highlightSelected: true },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const activePaneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
-    const selectedBorderChunk = output.chunks.find((chunk) => chunk.text === "▎ ");
+    const selectedBorderChunk = output.chunks.find((chunk) => chunk.text === "╎ ");
     const selectedSessionPaneChunk = output.chunks.find((chunk) => chunk.text === " bash");
     const selectedBranchChunk = output.chunks.find((chunk) => chunk.text === "╰─");
 
-    expect(text).toContain("▎ ╭─ opencode");
-    expect(text).toContain("▎ ╰─ bash");
+    expect(text).toContain("╎ ╭─ opencode");
+    expect(text).toContain("╎ ╰─ bash");
     expect(text).not.toContain(">");
-    expect(selectedBorderChunk?.fg?.slot).toBe(14);
+    expect(selectedBorderChunk?.fg?.slot).toBe(8);
     expect(selectedBorderChunk?.bg?.slot).toBe(235);
     expect(selectedSessionPaneChunk?.fg).toBeUndefined();
     expect(selectedSessionPaneChunk?.bg?.slot).toBe(235);
@@ -520,7 +523,7 @@ describe("render", () => {
     expect(activePaneChunk?.attributes).toBe(0);
   });
 
-  test("keeps selected session highlighting when not actively selecting", () => {
+  test("does not highlight the selected session unless requested", () => {
     const output = renderSessions(
       [
         session({
@@ -532,8 +535,8 @@ describe("render", () => {
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
 
-    expect(text).toContain("▎ ╶─ opencode");
-    expect(paneChunk?.bg?.slot).toBe(235);
+    expect(text).toContain("╎ ╶─ opencode");
+    expect(paneChunk?.bg).toBeUndefined();
   });
 
   test("uses a custom selected session background", () => {
@@ -541,7 +544,7 @@ describe("render", () => {
     const output = renderSessions(
       [session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] })],
       "$1",
-      { selectedBg },
+      { highlightSelected: true, selectedBg },
     );
     const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
 
@@ -594,13 +597,13 @@ describe("render", () => {
     const output = renderSessions(
       [session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] })],
       "$1",
-      { width: 20 },
+      { highlightSelected: true, width: 20 },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const selectedPaddingChunk = output.chunks.find((chunk) => chunk.text === "       ");
 
-    expect(text).toContain("▎ default           ");
-    expect(text).toContain("▎ ╶─ opencode       ");
+    expect(text).toContain("╎ default           ");
+    expect(text).toContain("╎ ╶─ opencode       ");
     expect(selectedPaddingChunk?.bg?.slot).toBe(235);
   });
 
@@ -612,6 +615,7 @@ describe("render", () => {
         }),
       ],
       "$1",
+      { highlightSelected: true },
     );
     const paneChunk = output.chunks.find((chunk) => chunk.text === " opencode");
 
@@ -634,13 +638,13 @@ describe("render", () => {
         }),
       ],
       "$1",
-      { selectedPaneId: "%2" },
+      { highlightSelected: true, selectedPaneId: "%2" },
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
     const selectedPaneMarker = output.chunks.find((chunk) => chunk.text === "▶─");
     const selectedPaneChunk = output.chunks.find((chunk) => chunk.text === " bash");
 
-    expect(text).toContain("▎ ▶─ bash");
+    expect(text).toContain("╎ ▶─ bash");
     expect(selectedPaneMarker?.fg?.slot).toBe(14);
     expect(selectedPaneMarker?.bg?.slot).toBe(235);
     expect(selectedPaneChunk?.bg?.slot).toBe(235);
