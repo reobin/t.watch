@@ -429,7 +429,7 @@ function sessionBorder(
     __isChunk: true,
     text: isAttached ? "▎ " : "╎ ",
     attributes: 0,
-    fg: statusFg ?? (isAttached ? RGBA.fromIndex(palette.brightCyan) : textMutedFg),
+    fg: statusFg ?? textMutedFg,
   } satisfies TextChunk;
 
   return isSelected ? selected(chunk, selectedBg) : chunk;

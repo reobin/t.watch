@@ -195,7 +195,7 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === " running")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg).toBeDefined();
     expect(output.chunks.find((chunk) => chunk.text === "/repo/work  work")?.fg?.slot).toBe(6);
-    expect(output.chunks.find((chunk) => chunk.text === "▎ ")?.fg?.slot).toBe(14);
+    expect(output.chunks.find((chunk) => chunk.text === "▎ ")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === "main")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "*")?.attributes).toBe(0);
