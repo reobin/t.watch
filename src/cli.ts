@@ -1,7 +1,5 @@
 import { formatBenchSummary } from "./benchmark";
-import { nextJumpPaneId } from "./navigation";
-import { focusPaneForAllClients, listSessions } from "./tmux";
-import type { AppOptions } from "./app";
+import { jumpToNextPane } from "./tmux/jump";
 
 type Output = {
   error(message: string): void;
@@ -9,14 +7,16 @@ type Output = {
 };
 
 type StartApp = (options?: AppOptions) => Promise<void>;
-type TmuxActions = {
-  focusPaneForAllClients: typeof focusPaneForAllClients;
-  listSessions: typeof listSessions;
+type AppOptions = {
+  closeOnFocus?: boolean;
+};
+type JumpActions = {
+  jumpToNextPane: typeof jumpToNextPane;
 };
 type AppMode = "default" | "popup";
 
 const help = `Usage: thud [--mode=default|popup] [--close-on-focus]
-       thud [help|version|jump|bench-results [path]]
+       thud [help|version|jump [pane-id]|bench-results [path]]
 
 Commands:
   thud          Start the HUD
@@ -29,16 +29,15 @@ Options:
   --mode=default     Keep thud open after focusing a target
   --mode=popup       Close thud after focusing a target
   --close-on-focus   Close thud after focusing a target`;
-const tmuxActions: TmuxActions = {
-  focusPaneForAllClients,
-  listSessions,
+const jumpActions: JumpActions = {
+  jumpToNextPane,
 };
 
 export async function runCli(
   argv: string[],
   startApp: StartApp,
   output: Output = console,
-  tmux: TmuxActions = tmuxActions,
+  jump: JumpActions = jumpActions,
 ): Promise<number> {
   const args = argv.slice(2);
   const parsedOptions = parseAppOptions(args);
@@ -58,8 +57,8 @@ export async function runCli(
     return 0;
   }
 
-  if (args.length === 1 && args[0] === "jump") {
-    return jumpToPane(output, tmux);
+  if (args[0] === "jump" && args.length <= 2) {
+    return jumpToPane(output, jump, args[1]);
   }
 
   if (args[0] === "bench-results" && args.length <= 2) {
@@ -98,24 +97,15 @@ function parseAppOptions(args: string[]): { ok: true; options: AppOptions } | { 
   return { ok: true, options: { closeOnFocus: closeOnFocus || mode === "popup" } };
 }
 
-async function jumpToPane(output: Output, tmux: TmuxActions): Promise<number> {
-  const result = await tmux.listSessions();
+async function jumpToPane(
+  output: Output,
+  jump: JumpActions,
+  currentPaneId?: string,
+): Promise<number> {
+  const result = await jump.jumpToNextPane(currentPaneId);
 
   if (result.ok === false) {
     output.error(result.message);
-    return 1;
-  }
-
-  const paneId = nextJumpPaneId(result.sessions, process.env.TMUX_PANE);
-
-  if (!paneId) {
-    return 0;
-  }
-
-  const focusResult = await tmux.focusPaneForAllClients(paneId);
-
-  if (focusResult.ok === false) {
-    output.error(focusResult.message);
     return 1;
   }
 

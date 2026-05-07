@@ -5,6 +5,10 @@ const jumpStatusPriority = [
   "idle",
   "running",
 ] as const satisfies readonly TmuxPaneIntegrationStatus[];
+type JumpPaneCandidate = {
+  id: string;
+  status?: TmuxPaneIntegrationStatus;
+};
 
 export function selectNextSession(
   sessions: TmuxSession[],
@@ -99,7 +103,9 @@ export function nextJumpPaneId(
   currentPaneId?: string,
 ): string | undefined {
   const panes = sessions.flatMap((session) =>
-    session.windows.flatMap((window) => window.panes.map((pane) => pane)),
+    session.windows.flatMap((window) =>
+      window.panes.map((pane) => ({ id: pane.id, status: pane.integration?.status })),
+    ),
   );
 
   if (panes.length === 0) {
@@ -107,14 +113,21 @@ export function nextJumpPaneId(
   }
 
   const resolvedCurrentPaneId = currentPaneId ?? currentAttachedActivePaneId(sessions);
-  const currentIndex = resolvedCurrentPaneId
-    ? panes.findIndex((pane) => pane.id === resolvedCurrentPaneId)
-    : -1;
+  return nextJumpPaneCandidateId(panes, resolvedCurrentPaneId);
+}
+
+export function nextJumpPaneCandidateId(
+  panes: JumpPaneCandidate[],
+  currentPaneId?: string,
+): string | undefined {
+  if (panes.length === 0) {
+    return undefined;
+  }
+
+  const currentIndex = currentPaneId ? panes.findIndex((pane) => pane.id === currentPaneId) : -1;
 
   for (const status of jumpStatusPriority) {
-    const pane = orderedAfterCurrent(panes, currentIndex).find(
-      (pane) => pane.integration?.status === status,
-    );
+    const pane = orderedAfterCurrent(panes, currentIndex).find((pane) => pane.status === status);
 
     if (pane) {
       return pane.id;

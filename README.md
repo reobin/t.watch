@@ -51,7 +51,7 @@ thud version
 Example tmux bindings:
 
 ```tmux
-bind-key J run-shell 'thud jump'
+bind-key J run-shell 'thud jump "#{pane_id}"'
 bind-key T display-popup -E -w 90% -h 90% 'thud --mode=popup'
 ```
 

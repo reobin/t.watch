@@ -72,6 +72,27 @@ export async function focusPaneForAllClients(paneId: string): Promise<TmuxFocusP
   }
 }
 
+export async function focusPaneForCurrentClient(paneId: string): Promise<TmuxFocusPaneResult> {
+  try {
+    const result = await runTmux(["switch-client", "-t", paneId]);
+
+    if (result.exitCode === 0) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: result.stderr.trim() || result.stdout.trim() || "tmux pane focus failed.",
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("ENOENT")) {
+      return { ok: false, message: missingTmuxMessage };
+    }
+
+    throw error;
+  }
+}
+
 async function listClients(): Promise<TmuxClientsResult> {
   const result = await runTmux(["list-clients", "-F", clientFormat]);
 

@@ -18,6 +18,9 @@ const summaryMetrics = [
   "processTreeMs",
   "gitMetadataMs",
   "watcherMs",
+  "jumpListPanesMs",
+  "jumpCurrentFocusMs",
+  "jumpFallbackFocusMs",
 ] as const;
 
 type BenchValue = string | number | boolean | null | undefined;
