@@ -243,6 +243,32 @@ function fitEnd(text: string, width: number | undefined): string {
   return `${text.slice(0, width - marker.length)}${marker}`;
 }
 
+function fitLine(chunks: TextChunk[], width: number | undefined): TextChunk[] {
+  if (width === undefined) {
+    return chunks;
+  }
+
+  const result: TextChunk[] = [];
+  let remaining = width;
+
+  for (const chunk of chunks) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    if (chunk.text.length <= remaining) {
+      result.push(chunk);
+      remaining -= chunk.text.length;
+      continue;
+    }
+
+    result.push({ ...chunk, text: chunk.text.slice(0, remaining) });
+    break;
+  }
+
+  return result;
+}
+
 function fitPath(path: string, width: number | undefined): string {
   if (width === undefined || path.length <= width) {
     return path;
@@ -316,11 +342,19 @@ function renderPaneName(
   hasFollowingPane: boolean,
   width: number | undefined,
 ): TextChunk[] {
-  return [
+  const paneRow = [
     renderPaneProcessName(pane, isActive, selectedPaneFg, activePaneFg, isSshAttachedSession),
     ...renderStatusPill(pane, textMutedFg),
+  ];
+
+  return [
+    ...fitLine(paneRow, paneNameContentWidth(width)),
     ...renderPaneContext(pane, textMutedFg, hasFollowingPane, width),
   ];
+}
+
+function paneNameContentWidth(width: number | undefined): number | undefined {
+  return rowContentWidth(width, 2);
 }
 
 function renderPaneContext(

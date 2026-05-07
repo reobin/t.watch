@@ -20,8 +20,8 @@ import { detectRenderTheme } from "./theme";
 import {
   findCurrentSessionId,
   findActivePaneId,
-  firstPaneId,
   firstSessionId,
+  findSessionIdForPane,
   hasPane,
   hasSession,
   isAttachedActivePane,
@@ -489,8 +489,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     }
 
     sessions = result.sessions;
-    const nextCurrentSessionId =
-      findCurrentSessionId(sessions, undefined) ?? firstSessionId(sessions);
+    const nextCurrentSessionId = resolvedCurrentSessionId();
     const appPaneLostTmuxFocus = Boolean(appPaneId) && !isAttachedActivePane(sessions, appPaneId);
 
     if (
@@ -653,10 +652,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   }
 
   function resetSelectedSessionToCurrent(): void {
-    const nextSelectedSessionId =
-      findCurrentSessionId(sessions, currentSessionId) ??
-      findCurrentSessionId(sessions, undefined) ??
-      firstSessionId(sessions);
+    const nextSelectedSessionId = resolvedCurrentSessionId();
     const wasSessionNavigationOpen = sessionNavigationOpen;
 
     closeSessionNavigation();
@@ -674,12 +670,25 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     renderCurrentView();
   }
 
+  function resolvedCurrentSessionId(): string | undefined {
+    const appPaneSessionId = findSessionIdForPane(sessions, appPaneId);
+    const attachedSessionId = findCurrentSessionId(sessions, undefined);
+    const previousSessionId = findCurrentSessionId(sessions, currentSessionId);
+
+    if (appMode === "popup") {
+      return appPaneSessionId ?? attachedSessionId ?? previousSessionId ?? firstSessionId(sessions);
+    }
+
+    return attachedSessionId ?? previousSessionId ?? appPaneSessionId ?? firstSessionId(sessions);
+  }
+
   async function focusSelectedSession(): Promise<void> {
     if (!selectedSessionId) {
       return;
     }
 
-    const paneId = firstPaneId(sessions.find((session) => session.id === selectedSessionId));
+    const session = sessions.find((session) => session.id === selectedSessionId);
+    const paneId = findActivePaneId(session);
 
     if (!paneId) {
       return;

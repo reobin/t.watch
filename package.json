@@ -11,7 +11,7 @@
   },
   "files": [
     "dist",
-    "integrations",
+    "integrations/opencode/thud-sh-status.ts",
     "README.md"
   ],
   "type": "module",

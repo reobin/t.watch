@@ -45,6 +45,17 @@ export function findCurrentSessionId(
   return sessions.find((session) => session.attached)?.id;
 }
 
+export function findSessionIdForPane(
+  sessions: TmuxSession[],
+  paneId: string | undefined,
+): string | undefined {
+  if (!paneId) {
+    return undefined;
+  }
+
+  return sessions.find((session) => hasPane(session, paneId))?.id;
+}
+
 export function firstSessionId(sessions: TmuxSession[]): string | undefined {
   return sessions[0]?.id;
 }

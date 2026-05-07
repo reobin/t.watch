@@ -98,6 +98,26 @@ describe("focusPaneForAllClients", () => {
     });
   });
 
+  test("reports list-clients failures", async () => {
+    mockTmuxResults([{ exitCode: 1, stderr: "server unavailable" }]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({
+      ok: false,
+      message: "server unavailable",
+    });
+  });
+
+  test("returns a helpful focus message when tmux is missing", async () => {
+    spyOn(Bun, "spawn").mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({
+      ok: false,
+      message: "tmux is required but was not found.",
+    });
+  });
+
   test("succeeds when at least one tmux client switches", async () => {
     mockTmuxResults([
       { exitCode: 0, stdout: "client-a\x1f/dev/pts/1\nclient-b\x1f/dev/pts/2" },

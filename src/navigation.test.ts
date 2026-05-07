@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   findCurrentSessionId,
   findActivePaneId,
+  findSessionIdForPane,
   firstPaneId,
   firstSessionId,
   hasPane,
@@ -61,6 +62,14 @@ describe("session navigation", () => {
     const sessions = [session("$1"), session("$2", { attached: true }), session("$3")];
 
     expect(findCurrentSessionId(sessions, undefined)).toBe("$2");
+  });
+
+  test("finds the session containing a pane", () => {
+    const sessions = [session("$1", { paneIds: ["%1"] }), session("$2", { paneIds: ["%2"] })];
+
+    expect(findSessionIdForPane(sessions, "%2")).toBe("$2");
+    expect(findSessionIdForPane(sessions, "%3")).toBeUndefined();
+    expect(findSessionIdForPane(sessions, undefined)).toBeUndefined();
   });
 
   test("prefers an explicit current session when it exists", () => {
