@@ -97,6 +97,50 @@ describe("focusPaneForAllClients", () => {
       message: "No tmux clients attached.",
     });
   });
+
+  test("succeeds when at least one tmux client switches", async () => {
+    mockTmuxResults([
+      { exitCode: 0, stdout: "client-a\x1f/dev/pts/1\nclient-b\x1f/dev/pts/2" },
+      { exitCode: 1, stderr: "first failed" },
+      { exitCode: 0 },
+    ]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({ ok: true });
+  });
+
+  test("reports switch-client stderr when every client fails", async () => {
+    mockTmuxResults([
+      { exitCode: 0, stdout: "client-a\x1f/dev/pts/1\nclient-b\x1f/dev/pts/2" },
+      { exitCode: 1 },
+      { exitCode: 1, stderr: "target pane missing" },
+    ]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({
+      ok: false,
+      message: "target pane missing",
+    });
+  });
+
+  test("falls back to switch-client stdout when stderr is empty", async () => {
+    mockTmuxResults([
+      { exitCode: 0, stdout: "client-a\x1f/dev/pts/1" },
+      { exitCode: 1, stdout: "target pane missing on stdout" },
+    ]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({
+      ok: false,
+      message: "target pane missing on stdout",
+    });
+  });
+
+  test("uses a default switch-client message without tmux output", async () => {
+    mockTmuxResults([{ exitCode: 0, stdout: "client-a\x1f/dev/pts/1" }, { exitCode: 1 }]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({
+      ok: false,
+      message: "tmux pane focus failed.",
+    });
+  });
 });
 
 function mockTmuxResults(
