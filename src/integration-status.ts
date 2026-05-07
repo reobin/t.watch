@@ -72,6 +72,40 @@ export function statusLabel(status: TmuxPaneIntegrationStatus): string {
   }
 }
 
+export function statusElapsedLabel(
+  status: TmuxPaneIntegrationStatus,
+  updatedAt: Date | undefined,
+  now = new Date(),
+): string | undefined {
+  if (status === "unknown" || !updatedAt) {
+    return undefined;
+  }
+
+  const elapsedSeconds = Math.floor((now.getTime() - updatedAt.getTime()) / 1000);
+
+  if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) {
+    return undefined;
+  }
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+
+  if (elapsedMinutes < 1) {
+    return "<1m";
+  }
+
+  if (elapsedMinutes < 60) {
+    return `${elapsedMinutes}m`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+
+  if (elapsedHours < 24) {
+    return `${elapsedHours}h`;
+  }
+
+  return `${Math.floor(elapsedHours / 24)}d`;
+}
+
 export function statusColor(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA): RGBA {
   switch (status) {
     case "idle":

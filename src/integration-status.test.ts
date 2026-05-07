@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { sessionStatusSummary } from "./integration-status";
+import { sessionStatusSummary, statusElapsedLabel } from "./integration-status";
 import type { TmuxSession } from "./tmux";
 
 describe("integration status", () => {
@@ -37,6 +37,28 @@ describe("integration status", () => {
     );
 
     expect(summary).toBeUndefined();
+  });
+
+  test("formats status elapsed time compactly", () => {
+    const now = new Date("2026-05-07T12:00:00.000Z");
+
+    expect(statusElapsedLabel("running", new Date("2026-05-07T11:59:18.000Z"), now)).toBe("<1m");
+    expect(statusElapsedLabel("running", new Date("2026-05-07T11:58:18.000Z"), now)).toBe("1m");
+    expect(statusElapsedLabel("waiting", new Date("2026-05-07T11:56:30.000Z"), now)).toBe("3m");
+    expect(statusElapsedLabel("idle", new Date("2026-05-07T09:40:00.000Z"), now)).toBe("2h");
+    expect(statusElapsedLabel("error", new Date("2026-05-03T12:00:00.000Z"), now)).toBe("4d");
+  });
+
+  test("omits elapsed time for unknown, missing, and future timestamps", () => {
+    const now = new Date("2026-05-07T12:00:00.000Z");
+
+    expect(
+      statusElapsedLabel("unknown", new Date("2026-05-07T11:59:18.000Z"), now),
+    ).toBeUndefined();
+    expect(statusElapsedLabel("running", undefined, now)).toBeUndefined();
+    expect(
+      statusElapsedLabel("running", new Date("2026-05-07T12:00:01.000Z"), now),
+    ).toBeUndefined();
   });
 });
 

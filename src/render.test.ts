@@ -339,6 +339,68 @@ describe("render", () => {
     }
   });
 
+  test("renders elapsed time for timestamped integration statuses", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({
+                  processName: "opencode",
+                  integration: {
+                    tool: "opencode",
+                    status: "waiting",
+                    updatedAt: new Date("2026-05-07T11:56:30.000Z"),
+                  },
+                }),
+                pane({
+                  processName: "opencode",
+                  integration: {
+                    tool: "opencode",
+                    status: "unknown",
+                    updatedAt: new Date("2026-05-07T11:59:18.000Z"),
+                  },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      undefined,
+      { now: new Date("2026-05-07T12:00:00.000Z") },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("● waiting 3m");
+    expect(text).toContain("● unknown");
+    expect(text).not.toContain("unknown <1m");
+  });
+
+  test("does not render elapsed time without integration timestamps", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({
+                  processName: "opencode",
+                  integration: { tool: "opencode", status: "running" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      undefined,
+      { now: new Date("2026-05-07T12:00:00.000Z") },
+    );
+
+    expect(output.chunks.map((chunk) => chunk.text).join("")).toContain("● running");
+    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("running ");
+  });
+
   test("keeps pane status labels muted", () => {
     const output = renderSessions([
       session({

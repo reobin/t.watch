@@ -42,6 +42,7 @@ const helpPanelMaxWidth = 72;
 const commandPanelHorizontalMargin = 4;
 const commandPanelChromeWidth = 4;
 const defaultModeIndicatorMs = 1000;
+const statusTickIntervalMs = 15000;
 
 type AppMode = "default" | "popup";
 
@@ -72,6 +73,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let renderTheme: RenderTheme = {};
   let initialRefreshComplete = false;
   let defaultModeIndicatorTimer: ReturnType<typeof setTimeout> | undefined;
+  let statusTickTimer: ReturnType<typeof setInterval> | undefined;
   let suspendHandlerRegistered = false;
   const appPaneId = process.env.TMUX_PANE;
   const startupBench = createBenchRun("startup", {
@@ -95,6 +97,10 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       if (defaultModeIndicatorTimer) {
         clearTimeout(defaultModeIndicatorTimer);
+      }
+
+      if (statusTickTimer) {
+        clearInterval(statusTickTimer);
       }
 
       void sessionWatcher?.stop();
@@ -484,6 +490,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       selectedSessionId = undefined;
       currentSessionId = undefined;
       closePaneNavigation();
+      syncStatusTickTimer();
       screen.setContent(renderMessage(result.message));
       return false;
     }
@@ -506,12 +513,34 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
     if (sessions.length === 0) {
       closePaneNavigation();
+      syncStatusTickTimer();
       screen.setContent(renderNoSessions());
       return true;
     }
 
+    syncStatusTickTimer();
     renderCurrentView();
     return true;
+  }
+
+  function syncStatusTickTimer(): void {
+    if (hasTickingStatus(sessions)) {
+      if (statusTickTimer) {
+        return;
+      }
+
+      statusTickTimer = setInterval(() => {
+        if (!isDestroyed && sessions.length > 0) {
+          renderCurrentView();
+        }
+      }, statusTickIntervalMs);
+      return;
+    }
+
+    if (statusTickTimer) {
+      clearInterval(statusTickTimer);
+      statusTickTimer = undefined;
+    }
   }
 
   function renderCurrentView(): void {
@@ -534,6 +563,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       renderSessions(sessions, selectedSessionId, {
         ...renderTheme,
         highlightSelected: sessionNavigationOpen || paneNavigationOpen,
+        now: new Date(),
         selectedPaneId: paneNavigationOpen ? selectedPaneId : undefined,
         width: terminalWidth,
       }),
@@ -761,4 +791,15 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       selectedPaneId = findActivePaneId(session);
     }
   }
+}
+
+export function hasTickingStatus(sessions: TmuxSession[]): boolean {
+  return sessions.some((session) =>
+    session.windows.some((window) =>
+      window.panes.some(
+        (pane) =>
+          pane.integration?.status !== "unknown" && pane.integration?.updatedAt !== undefined,
+      ),
+    ),
+  );
 }

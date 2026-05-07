@@ -1,6 +1,12 @@
 import { homedir } from "node:os";
 import { RGBA, StyledText, bold, fg, type TextChunk } from "@opentui/core";
-import { sessionStatusSummary, statusCircle, statusColor, statusLabel } from "./integration-status";
+import {
+  sessionStatusSummary,
+  statusCircle,
+  statusColor,
+  statusElapsedLabel,
+  statusLabel,
+} from "./integration-status";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const palette = {
@@ -16,6 +22,7 @@ const rowRightGutterWidth = 2;
 
 export type RenderTheme = {
   highlightSelected?: boolean;
+  now?: Date;
   selectedBg?: RGBA;
   selectedPaneId?: string;
   textMutedFg?: RGBA;
@@ -52,6 +59,7 @@ export function renderSessions(
         theme.selectedPaneId,
         selectedBg,
         textMutedFg,
+        theme.now,
         theme.width,
       ),
     ]),
@@ -65,6 +73,7 @@ function renderSession(
   selectedPaneId: string | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
+  now: Date | undefined,
   width: number | undefined,
 ): TextChunk[] {
   const headerText = session.path
@@ -109,6 +118,7 @@ function renderSession(
           session.sshAttached,
           textMutedFg,
           paneIndex < window.panes.length - 1,
+          now,
           width,
         ),
       ];
@@ -340,11 +350,12 @@ function renderPaneName(
   isSshAttachedSession: boolean,
   textMutedFg: RGBA,
   hasFollowingPane: boolean,
+  now: Date | undefined,
   width: number | undefined,
 ): TextChunk[] {
   const paneRow = [
     renderPaneProcessName(pane, isActive, selectedPaneFg, activePaneFg, isSshAttachedSession),
-    ...renderStatusPill(pane, textMutedFg),
+    ...renderStatusPill(pane, textMutedFg, now),
   ];
 
   return [
@@ -412,7 +423,7 @@ function renderPaneProcessName(
   return isActive ? active(name) : textChunk(name);
 }
 
-function renderStatusPill(pane: TmuxPane, textMutedFg: RGBA): TextChunk[] {
+function renderStatusPill(pane: TmuxPane, textMutedFg: RGBA, now: Date | undefined): TextChunk[] {
   const integration = pane.integration;
 
   if (!integration) {
@@ -420,10 +431,11 @@ function renderStatusPill(pane: TmuxPane, textMutedFg: RGBA): TextChunk[] {
   }
 
   const label = integration.label ?? statusLabel(integration.status);
+  const elapsed = statusElapsedLabel(integration.status, integration.updatedAt, now);
   return [
     textChunk(" "),
     statusCircle(integration.status, textMutedFg),
-    muted(` ${label}`, textMutedFg),
+    muted(` ${elapsed ? `${label} ${elapsed}` : label}`, textMutedFg),
   ];
 }
 
