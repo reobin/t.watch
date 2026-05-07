@@ -1,10 +1,15 @@
 import { homedir } from "node:os";
 import { RGBA, StyledText, bold, fg, type TextChunk } from "@opentui/core";
+import {
+  sessionStatusSummary,
+  statusCircle,
+  statusColor,
+  statusLabel,
+  type IntegrationStatusSummary,
+} from "./integration-status";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const palette = {
-  red: 1,
-  green: 2,
   magenta: 5,
   cyan: 6,
   gitDirty: 5,
@@ -74,8 +79,10 @@ function renderSession(
   const header = session.path
     ? headerText
     : fitMiddle(headerText, sessionHeaderContentWidth(width));
+  const sessionStatus = sessionStatusSummary(session);
   const chunks: TextChunk[] = [
     renderSessionHeader(header, session),
+    ...renderSessionStatus(sessionStatus, textMutedFg, width),
     ...renderSessionMetadata(session, textMutedFg, width),
   ];
   const isSelectedSession = session.id === selectedSessionId;
@@ -106,6 +113,7 @@ function renderSession(
     chunks,
     isHighlightedSession,
     session.attached,
+    sessionStatus?.status,
     selectedBg,
     textMutedFg,
     width,
@@ -122,12 +130,37 @@ function renderSessionMetadata(
   return metadata ? renderGitStatus(metadata, session.gitDirty, textMutedFg) : [];
 }
 
+function renderSessionStatus(
+  summary: IntegrationStatusSummary | undefined,
+  textMutedFg: RGBA,
+  width: number | undefined,
+): TextChunk[] {
+  if (!summary) {
+    return [];
+  }
+
+  const label =
+    summary.count > 1
+      ? `${summary.count} ${statusLabel(summary.status)}`
+      : statusLabel(summary.status);
+
+  return [
+    muted("\n", textMutedFg),
+    statusCircle(summary.status, textMutedFg),
+    muted(` ${fitEnd(label, sessionStatusLabelContentWidth(width))}`, textMutedFg),
+  ];
+}
+
 function sessionHeaderContentWidth(width: number | undefined): number | undefined {
   return rowContentWidth(width, 0);
 }
 
 function metadataContentWidth(width: number | undefined): number | undefined {
   return rowContentWidth(width, 0);
+}
+
+function sessionStatusLabelContentWidth(width: number | undefined): number | undefined {
+  return rowContentWidth(width, 2);
 }
 
 function rowContentWidth(
@@ -352,36 +385,6 @@ function renderStatusPill(pane: TmuxPane, textMutedFg: RGBA): TextChunk[] {
   ];
 }
 
-function statusCircle(status: TmuxPaneIntegrationStatus, textMutedFg: RGBA): TextChunk {
-  switch (status) {
-    case "idle":
-      return bold(terminalFg(palette.green, "●"));
-    case "running":
-      return bold(terminalFg(palette.cyan, "●"));
-    case "waiting":
-      return bold(terminalFg(palette.magenta, "●"));
-    case "error":
-      return bold(terminalFg(palette.red, "●"));
-    case "unknown":
-      return fg(textMutedFg)("●");
-  }
-}
-
-function statusLabel(status: TmuxPaneIntegrationStatus): string {
-  switch (status) {
-    case "idle":
-      return "idle";
-    case "running":
-      return "running";
-    case "waiting":
-      return "waiting";
-    case "error":
-      return "error";
-    case "unknown":
-      return "unknown";
-  }
-}
-
 function active(text: string): TextChunk {
   return bold(terminalFg(palette.cyan, text));
 }
@@ -397,6 +400,7 @@ function sessionBlock(
   chunks: TextChunk[],
   isSelected: boolean,
   isAttached: boolean,
+  sessionStatus: TmuxPaneIntegrationStatus | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
   width: number | undefined,
@@ -432,7 +436,7 @@ function sessionBlock(
   return result;
 
   function startLine(): void {
-    result.push(sessionBorder(isSelected, isAttached, selectedBg, textMutedFg));
+    result.push(sessionBorder(isSelected, isAttached, sessionStatus, selectedBg, textMutedFg));
     lineLength = 2;
   }
 
@@ -448,14 +452,16 @@ function sessionBlock(
 function sessionBorder(
   isSelected: boolean,
   isAttached: boolean,
+  sessionStatus: TmuxPaneIntegrationStatus | undefined,
   selectedBg: RGBA,
   textMutedFg: RGBA,
 ): TextChunk {
+  const statusFg = sessionStatus ? statusColor(sessionStatus, textMutedFg) : undefined;
   const chunk = {
     __isChunk: true,
     text: isAttached ? "▎ " : "╎ ",
     attributes: 0,
-    fg: isAttached ? RGBA.fromIndex(palette.brightCyan) : textMutedFg,
+    fg: statusFg ?? (isAttached ? RGBA.fromIndex(palette.brightCyan) : textMutedFg),
   } satisfies TextChunk;
 
   return isSelected ? selected(chunk, selectedBg) : chunk;

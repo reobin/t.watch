@@ -322,18 +322,72 @@ describe("render", () => {
     expect(text).toContain("● unknown");
     const markers = output.chunks.filter((chunk) => chunk.text === "●");
 
-    expect(markers).toHaveLength(5);
+    expect(markers).toHaveLength(6);
     expect(markers.map((chunk) => chunk.fg?.intent)).toEqual([
       "indexed",
       "indexed",
       "indexed",
       "indexed",
       "indexed",
+      "indexed",
     ]);
-    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([2, 6, 5, 1, 8]);
+    expect(markers.map((chunk) => chunk.fg?.slot)).toEqual([5, 2, 6, 5, 1, 8]);
     for (const chunk of markers) {
       expect(chunk.fg).toBeDefined();
     }
+  });
+
+  test("renders actionable agent status at the session level", () => {
+    const output = renderSessions([
+      session({
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "running" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "idle" },
+              }),
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "waiting" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+    const sessionStatusMarker = output.chunks.find((chunk) => chunk.text === "●");
+    const sessionBorder = output.chunks.find((chunk) => chunk.text === "╎ ");
+
+    expect(text).toContain("╎ default\n╎ ● waiting\n╎ ╭─ opencode ● running");
+    expect(text).toContain("╎ ╰─ opencode ● waiting");
+    expect(sessionStatusMarker?.fg?.slot).toBe(5);
+    expect(sessionBorder?.fg?.slot).toBe(5);
+  });
+
+  test("keeps running-only agent status at the pane level", () => {
+    const output = renderSessions([
+      session({
+        windows: [
+          window({
+            panes: [
+              pane({
+                processName: "opencode",
+                integration: { tool: "opencode", status: "running" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toBe(["╎ default", "╎ ╶─ opencode ● running"].join("\n"));
   });
 
   test("renders OpenCode pane titles as pane context", () => {
