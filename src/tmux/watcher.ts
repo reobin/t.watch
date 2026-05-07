@@ -17,6 +17,9 @@ const sessionChangeHooks = [
   "client-detached",
   "client-session-changed",
 ] as const;
+const sessionChangeChannel = "thud-sh-sessions";
+const staleHookPattern =
+  /^(\S+\[([0-9]+)\]).*\bwait-for -S thud-sh-(?:sessions(?:-[0-9]+)?|client-focus-out-[0-9]+)/;
 
 export async function watchSessions(
   onChange: () => void | Promise<void>,
@@ -24,7 +27,7 @@ export async function watchSessions(
   onClientFocusOut?: () => void | Promise<void>,
 ): Promise<TmuxSessionWatchResult> {
   const hookIndex = String(process.pid);
-  const channel = `thud-sh-sessions-${process.pid}`;
+  const channel = sessionChangeChannel;
   const clientFocusOutChannel = `thud-sh-client-focus-out-${process.pid}`;
   const installedHooks: string[] = [];
   let waitProcess: ReturnType<typeof Bun.spawn> | undefined;
@@ -35,6 +38,8 @@ export async function watchSessions(
   let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
+    await cleanupStaleHooks();
+
     for (const hook of sessionChangeHooks) {
       const hookTarget = `${hook}[${hookIndex}]`;
       const result = await runTmux(["set-hook", "-g", hookTarget, `wait-for -S ${channel}`]);
@@ -199,6 +204,39 @@ export async function watchSessions(
 
 async function unsetHooks(hooks: string[]): Promise<void> {
   await Promise.all(hooks.map((hook) => runTmux(["set-hook", "-gu", hook]).catch(() => undefined)));
+}
+
+async function cleanupStaleHooks(): Promise<void> {
+  const result = await runTmux(["show-hooks", "-g"]);
+
+  if (result.exitCode !== 0) {
+    return;
+  }
+
+  const hooks = result.stdout
+    .trim()
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const match = line.match(staleHookPattern);
+      const pid = Number(match?.[2]);
+
+      return match?.[1] && pid !== process.pid && !processExists(pid) ? [match[1]] : [];
+    });
+
+  await unsetHooks(hooks);
+}
+
+function processExists(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM";
+  }
 }
 
 async function isFocusEventsEnabled(): Promise<boolean> {

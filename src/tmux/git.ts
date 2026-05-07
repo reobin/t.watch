@@ -3,19 +3,43 @@ type GitMetadata = {
   dirty?: boolean;
 };
 
-export async function gitMetadata(path: string): Promise<GitMetadata> {
+type GitMetadataOptions = {
+  force?: boolean;
+};
+
+const gitMetadataCacheTtlMs = 10000;
+const gitMetadataCache = new Map<string, { metadata: GitMetadata; updatedAt: number }>();
+
+export async function gitMetadata(
+  path: string,
+  options: GitMetadataOptions = {},
+): Promise<GitMetadata> {
+  const cached = gitMetadataCache.get(path);
+  const now = Date.now();
+
+  if (!options.force && cached && now - cached.updatedAt < gitMetadataCacheTtlMs) {
+    return cached.metadata;
+  }
+
   const branch = await gitBranch(path);
 
   if (!branch) {
-    return {};
+    const metadata = {};
+
+    gitMetadataCache.set(path, { metadata, updatedAt: now });
+
+    return metadata;
   }
 
   const dirty = await gitDirty(path);
-
-  return {
+  const metadata = {
     branch,
     ...(dirty ? { dirty } : {}),
   };
+
+  gitMetadataCache.set(path, { metadata, updatedAt: now });
+
+  return metadata;
 }
 
 async function gitBranch(path: string): Promise<string | undefined> {

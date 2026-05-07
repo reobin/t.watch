@@ -205,7 +205,7 @@ describe("listSessions", () => {
       ],
     });
 
-    const result = await listSessions();
+    const result = await listSessions({ forceGit: true });
 
     expect(result).toMatchObject({
       ok: true,
@@ -259,7 +259,7 @@ describe("listSessions", () => {
       ],
     });
 
-    const result = await listSessions();
+    const result = await listSessions({ forceGit: true });
 
     expect(result).toMatchObject({
       ok: true,
@@ -316,7 +316,7 @@ describe("listSessions", () => {
       ],
     });
 
-    const result = await listSessions();
+    const result = await listSessions({ forceGit: true });
 
     expect(result).toMatchObject({
       ok: true,
@@ -356,7 +356,7 @@ describe("listSessions", () => {
       ],
     });
 
-    const result = await listSessions();
+    const result = await listSessions({ forceGit: true });
 
     expect(result).toMatchObject({
       ok: true,

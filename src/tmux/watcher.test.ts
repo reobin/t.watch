@@ -192,6 +192,7 @@ describe("watchSessions", () => {
     });
 
     expect(calls).toEqual([
+      showHooksCall(),
       installHookCall("session-created"),
       installHookCall("session-closed"),
       unsetHookCall("session-created"),
@@ -293,7 +294,11 @@ describe("watchSessions", () => {
 });
 
 function installHookCalls(): string[][] {
-  return hooks.map(installHookCall);
+  return [showHooksCall(), ...hooks.map(installHookCall)];
+}
+
+function showHooksCall(): string[] {
+  return ["tmux", "show-hooks", "-g"];
 }
 
 function installHookCall(hook: (typeof hooks)[number]): string[] {
@@ -343,7 +348,7 @@ function hookTarget(hook: string): string {
 }
 
 function channel(): string {
-  return `thud-sh-sessions-${process.pid}`;
+  return "thud-sh-sessions";
 }
 
 function focusOutChannel(): string {

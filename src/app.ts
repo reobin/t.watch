@@ -1,7 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import { benchNow, createBenchRun, elapsedMs } from "./benchmark";
 import {
-  checkTmux,
   focusPaneForAllClients,
   listSessions,
   watchSessions,
@@ -9,7 +8,13 @@ import {
   type TmuxSessionWatcher,
 } from "./tmux";
 import { renderCommandPanel, renderHelpPanel, type CommandPanelItem } from "./command-panel";
-import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
+import {
+  renderLoading,
+  renderMessage,
+  renderNoSessions,
+  renderSessions,
+  type RenderTheme,
+} from "./render";
 import { createScreen } from "./screen";
 import { detectRenderTheme } from "./theme";
 import {
@@ -27,7 +32,8 @@ import {
   selectPreviousSession,
 } from "./navigation";
 
-const refreshIntervalMs = 1500;
+const fallbackRefreshIntervalMs = 1500;
+const safetyRefreshIntervalMs = 15000;
 const paletteTimeoutMs = 100;
 const enableTerminalFocusReporting = "\x1b[?1004h";
 const disableTerminalFocusReporting = "\x1b[?1004l";
@@ -46,6 +52,10 @@ export type AppOptions = {
 export async function startApp(options: AppOptions = {}): Promise<void> {
   let isDestroyed = false;
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
+  let refreshTimerIntervalMs: number | undefined;
+  let refreshPromise: Promise<boolean> | undefined;
+  let refreshQueued = false;
+  let nextRefreshForceGit = false;
   let sessionWatcher: TmuxSessionWatcher | undefined;
   let isStartingWatcher = false;
   let isFocusingPane = false;
@@ -59,6 +69,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let activePanel: "commands" | "help" | undefined;
   let selectedCommandIndex = 0;
   let appMode: AppMode = options.closeOnFocus ? "popup" : "default";
+  let renderTheme: RenderTheme = {};
+  let initialRefreshComplete = false;
   let defaultModeIndicatorTimer: ReturnType<typeof setTimeout> | undefined;
   let suspendHandlerRegistered = false;
   const appPaneId = process.env.TMUX_PANE;
@@ -93,12 +105,23 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   addSuspendHandler();
   process.on("SIGCONT", handleResume);
 
-  process.stdout.write(enableTerminalFocusReporting);
   const themeStartedAt = benchNow();
-  const renderTheme = await detectRenderTheme(renderer, paletteTimeoutMs);
-  startupBench.add({ themeMs: elapsedMs(themeStartedAt) });
   const screen = createScreen(renderer, renderLoading(), renderTheme);
   terminalWidth = renderer.width;
+  process.stdout.write(enableTerminalFocusReporting);
+  void detectRenderTheme(renderer, paletteTimeoutMs)
+    .then((theme) => {
+      if (isDestroyed) {
+        return;
+      }
+
+      renderTheme = theme;
+      startupBench.add({ themeMs: elapsedMs(themeStartedAt) });
+      if (initialRefreshComplete) {
+        renderCurrentView();
+      }
+    })
+    .catch(() => undefined);
   const commands: (CommandPanelItem & { run: () => void | Promise<void> })[] = [
     {
       label: "Focus session",
@@ -110,7 +133,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     },
     {
       label: "Refresh sessions",
-      run: refreshSessions,
+      run: () => refreshSessions({ forceGit: true }),
     },
     {
       label: "Cycle mode",
@@ -299,29 +322,25 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       void focusSelectedSession();
     }
   });
-  const tmuxCheckStartedAt = benchNow();
-  const tmux = await checkTmux();
-  startupBench.add({ tmuxCheckMs: elapsedMs(tmuxCheckStartedAt) });
+  const refreshStartedAt = benchNow();
+  const firstRefreshOk = await refreshSessions({ forceGit: true });
+  initialRefreshComplete = true;
+  startupBench.add({
+    firstRenderMs: startupBench.elapsed(),
+    processUptimeAtFirstRenderMs: Math.round(process.uptime() * 10000) / 10,
+    refreshSessionsMs: elapsedMs(refreshStartedAt),
+    sessionCount: sessions.length,
+  });
 
-  if (tmux.ok === true) {
-    const refreshStartedAt = benchNow();
-    await refreshSessions();
-    startupBench.add({
-      firstRenderMs: startupBench.elapsed(),
-      processUptimeAtFirstRenderMs: Math.round(process.uptime() * 10000) / 10,
-      refreshSessionsMs: elapsedMs(refreshStartedAt),
-      sessionCount: sessions.length,
-    });
-
+  if (firstRefreshOk) {
     if (appMode !== "popup") {
       void benchmarkSessionWatcher();
     }
 
-    startRefreshPolling();
+    startRefreshPolling(fallbackRefreshIntervalMs);
     startupBench.log({ ok: true, watcherSkipped: appMode === "popup" });
   } else {
-    screen.setContent(renderMessage(tmux.message));
-    startupBench.log({ ok: false, message: tmux.message });
+    startupBench.log({ ok: false });
   }
 
   async function benchmarkSessionWatcher(): Promise<void> {
@@ -373,10 +392,12 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     isStartingWatcher = true;
     try {
       const result = await watchSessions(
-        refreshSessions,
+        () => {
+          void refreshSessions();
+        },
         () => {
           sessionWatcher = undefined;
-          startRefreshPolling();
+          startRefreshPolling(fallbackRefreshIntervalMs);
         },
         resetSelectedSessionToCurrent,
       );
@@ -391,31 +412,71 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       if (result.ok === true) {
         sessionWatcher = result.watcher;
+        startRefreshPolling(safetyRefreshIntervalMs);
       }
     } finally {
       isStartingWatcher = false;
     }
   }
 
-  function startRefreshPolling(): void {
-    if (isDestroyed || refreshTimer) {
+  function startRefreshPolling(intervalMs: number): void {
+    if (isDestroyed || refreshTimerIntervalMs === intervalMs) {
       return;
     }
+
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+    }
+
+    refreshTimerIntervalMs = intervalMs;
 
     refreshTimer = setInterval(() => {
       void refreshSessions();
 
-      if (appMode !== "popup") {
+      if (appMode !== "popup" && !sessionWatcher) {
         void benchmarkSessionWatcher();
       }
-    }, refreshIntervalMs);
+    }, intervalMs);
   }
 
-  async function refreshSessions(): Promise<void> {
-    const result = await listSessions();
+  async function refreshSessions(options: { forceGit?: boolean } = {}): Promise<boolean> {
+    if (options.forceGit) {
+      nextRefreshForceGit = true;
+    }
+
+    if (refreshPromise) {
+      refreshQueued = true;
+
+      return refreshPromise;
+    }
+
+    refreshPromise = runRefreshSessionsLoop();
+
+    try {
+      return await refreshPromise;
+    } finally {
+      refreshPromise = undefined;
+    }
+  }
+
+  async function runRefreshSessionsLoop(): Promise<boolean> {
+    let ok = true;
+
+    do {
+      refreshQueued = false;
+      const forceGit = nextRefreshForceGit;
+      nextRefreshForceGit = false;
+      ok = await refreshSessionsOnce({ forceGit });
+    } while (refreshQueued && !isDestroyed);
+
+    return ok;
+  }
+
+  async function refreshSessionsOnce(options: { forceGit?: boolean } = {}): Promise<boolean> {
+    const result = await listSessions({ forceGit: options.forceGit });
 
     if (isDestroyed) {
-      return;
+      return result.ok;
     }
 
     if (result.ok === false) {
@@ -424,7 +485,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       currentSessionId = undefined;
       closePaneNavigation();
       screen.setContent(renderMessage(result.message));
-      return;
+      return false;
     }
 
     sessions = result.sessions;
@@ -447,10 +508,11 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     if (sessions.length === 0) {
       closePaneNavigation();
       screen.setContent(renderNoSessions());
-      return;
+      return true;
     }
 
     renderCurrentView();
+    return true;
   }
 
   function renderCurrentView(): void {

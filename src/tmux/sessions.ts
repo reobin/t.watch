@@ -44,6 +44,10 @@ const paneFormat = [
 ].join(fieldSeparator);
 const clientFormat = ["#{session_id}", "#{client_pid}"].join(fieldSeparator);
 
+type ListSessionsOptions = {
+  forceGit?: boolean;
+};
+
 type PaneRecord = Omit<TmuxPane, "ssh"> & {
   sessionId: string;
   windowId: string;
@@ -63,7 +67,7 @@ type ClientRecord = {
   pid: number;
 };
 
-export async function listSessions(): Promise<TmuxSessionsResult> {
+export async function listSessions(options: ListSessionsOptions = {}): Promise<TmuxSessionsResult> {
   const bench = createBenchRun("session_lookup");
   const timings: Record<string, number> = {};
 
@@ -95,7 +99,7 @@ export async function listSessions(): Promise<TmuxSessionsResult> {
         .filter(Boolean)
         .map((line) => parseSession(line, windowsBySession, sshAttachedSessions));
       const sessionsWithMetadata = await benchAsync("gitMetadataMs", timings, () =>
-        withSessionMetadata(sessions),
+        withSessionMetadata(sessions, options),
       );
 
       bench.add(timings);
@@ -434,7 +438,10 @@ function groupWindowsBySession(
   return windowsBySession;
 }
 
-async function withSessionMetadata(sessions: TmuxSession[]): Promise<TmuxSession[]> {
+async function withSessionMetadata(
+  sessions: TmuxSession[],
+  options: ListSessionsOptions,
+): Promise<TmuxSession[]> {
   return Promise.all(
     sessions.map(async (session) => {
       const path = sessionPath(session);
@@ -443,7 +450,7 @@ async function withSessionMetadata(sessions: TmuxSession[]): Promise<TmuxSession
         return session;
       }
 
-      const git = await gitMetadata(path);
+      const git = await gitMetadata(path, { force: options.forceGit });
 
       return {
         ...session,

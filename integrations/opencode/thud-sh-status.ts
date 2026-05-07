@@ -13,15 +13,22 @@ type OpenCodePluginContext = {
 };
 
 const tool = "opencode";
+const thudRefreshChannel = "thud-sh-sessions";
 
 export const ThudShStatus = async ({ $ }: OpenCodePluginContext) => {
   const pane = process.env.TMUX_PANE;
   let currentStatus = "unknown";
+  let currentLabel: string | undefined;
   let statusBeforeRequest: string | undefined;
   let statusUpdate = Promise.resolve();
 
   async function setStatus(status: string, label?: string): Promise<void> {
+    if (status === currentStatus && label === currentLabel) {
+      return;
+    }
+
     currentStatus = status;
+    currentLabel = label;
 
     if (!pane) {
       return;
@@ -29,15 +36,12 @@ export const ThudShStatus = async ({ $ }: OpenCodePluginContext) => {
 
     const updatedAt = Math.floor(Date.now() / 1000).toString();
 
-    await $`tmux set-option -p -t ${pane} @thud_sh_tool ${tool}`.quiet();
-    await $`tmux set-option -p -t ${pane} @thud_sh_status ${status}`.quiet();
-    await $`tmux set-option -p -t ${pane} @thud_sh_status_updated_at ${updatedAt}`.quiet();
-
     if (label) {
-      await $`tmux set-option -p -t ${pane} @thud_sh_status_label ${label}`.quiet();
-    } else {
-      await $`tmux set-option -pu -t ${pane} @thud_sh_status_label`.quiet();
+      await $`tmux set-option -p -t ${pane} @thud_sh_tool ${tool} \; set-option -p -t ${pane} @thud_sh_status ${status} \; set-option -p -t ${pane} @thud_sh_status_updated_at ${updatedAt} \; set-option -p -t ${pane} @thud_sh_status_label ${label} \; wait-for -S ${thudRefreshChannel}`.quiet();
+      return;
     }
+
+    await $`tmux set-option -p -t ${pane} @thud_sh_tool ${tool} \; set-option -p -t ${pane} @thud_sh_status ${status} \; set-option -p -t ${pane} @thud_sh_status_updated_at ${updatedAt} \; set-option -pu -t ${pane} @thud_sh_status_label \; wait-for -S ${thudRefreshChannel}`.quiet();
   }
 
   function queueStatus(status: string, label?: string): Promise<void> {
