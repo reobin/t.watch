@@ -1,4 +1,4 @@
-export type GitMetadata = {
+type GitMetadata = {
   branch?: string;
   dirty?: boolean;
 };

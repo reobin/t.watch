@@ -16,7 +16,7 @@ const terminalFg = RGBA.defaultForeground();
 const terminalBg = RGBA.defaultBackground();
 const muted = RGBA.fromIndex(8);
 
-export type Screen = {
+type Screen = {
   setCommandPanel: (content: ScreenContent) => void;
   setCommandPanelVisible: (visible: boolean) => void;
   setCommandPanelWidth: (width: number) => void;

@@ -41,9 +41,14 @@ export type TmuxPane = {
   integration?: TmuxPaneIntegration;
 };
 
-export type TmuxPaneIntegrationStatus = "idle" | "running" | "waiting" | "error" | "unknown";
+export type TmuxPaneIntegrationStatus =
+  | "idle"
+  | "running"
+  | "waiting"
+  | "error"
+  | "unknown";
 
-export type TmuxPaneIntegration = {
+type TmuxPaneIntegration = {
   tool: string;
   status: TmuxPaneIntegrationStatus;
   label?: string;

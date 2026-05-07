@@ -17,14 +17,14 @@ const palette = {
   selectedBg: 235,
 } as const;
 
-export type CommandPanelContent = string | StyledText;
+type CommandPanelContent = string | StyledText;
 
 export type CommandPanelItem = {
   description?: string;
   label: string;
 };
 
-export type CommandPanelOverlay = {
+type CommandPanelOverlay = {
   setContent: (content: CommandPanelContent) => void;
   setVisible: (visible: boolean) => void;
   setWidth: (width: number) => void;

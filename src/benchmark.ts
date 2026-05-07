@@ -23,7 +23,7 @@ const summaryMetrics = [
 type BenchValue = string | number | boolean | null | undefined;
 type BenchFields = Record<string, BenchValue>;
 
-export type BenchRun = {
+type BenchRun = {
   readonly enabled: boolean;
   readonly startedAt: number;
   add(fields: BenchFields): void;
@@ -33,11 +33,11 @@ export type BenchRun = {
 
 type BenchRecord = Record<string, unknown>;
 
-export function isBenchEnabled(): boolean {
+function isBenchEnabled(): boolean {
   return process.env.THUD_BENCH === "1" || process.env.THUD_BENCH === "true";
 }
 
-export function benchLogPath(): string {
+function benchLogPath(): string {
   return process.env.THUD_BENCH_LOG || defaultBenchLogPath;
 }
 
@@ -95,7 +95,7 @@ export function elapsedMs(startedAt: number): number {
   return Math.round((benchNow() - startedAt) * 10) / 10;
 }
 
-export function writeBenchRecord(fields: BenchFields): void {
+function writeBenchRecord(fields: BenchFields): void {
   if (!isBenchEnabled()) {
     return;
   }
