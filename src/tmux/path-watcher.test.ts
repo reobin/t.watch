@@ -126,6 +126,58 @@ describe("watchPanePaths", () => {
     }
   });
 
+  test("uses the first listed session when no current session is available", async () => {
+    const calls: string[][] = [];
+    const commands: string[] = [];
+    const controlExited = deferred<number>();
+
+    spyOn(Bun, "spawn").mockImplementation((command) => {
+      const args = Array.isArray(command) ? command : command.cmd;
+      calls.push([...args]);
+
+      if (args[1] === "display-message") {
+        return processResult({ exited: Promise.resolve(1), stdout: "" });
+      }
+
+      if (args[1] === "list-sessions") {
+        return processResult({ exited: Promise.resolve(0), stdout: "$9\n$8\n" });
+      }
+
+      if (args[1] === "list-panes") {
+        return processResult({ exited: Promise.resolve(0), stdout: "%1\n" });
+      }
+
+      if (args[1] === "-C") {
+        return processResult({
+          exited: controlExited.promise,
+          stdin: new WritableStream<Uint8Array>({
+            write(chunk) {
+              commands.push(decoder.decode(chunk));
+            },
+          }),
+          stdout: new ReadableStream<Uint8Array>(),
+        });
+      }
+
+      return processResult({ exited: Promise.resolve(0) });
+    });
+
+    const result = await watchPanePaths(() => undefined);
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual([
+      ["tmux", "display-message", "-p", "#{session_id}"],
+      ["tmux", "list-sessions", "-F", "#{session_id}"],
+      ["tmux", "-C", "attach-session", "-t", "$9"],
+      ["tmux", "list-panes", "-a", "-F", "#{pane_id}"],
+    ]);
+    expect(commands).toEqual(["refresh-client -B 'thud-sh-path-_1:%1:#{pane_current_path}'\n"]);
+
+    if (result.ok === true) {
+      await result.watcher.stop();
+    }
+  });
+
   test("skips the watcher when the current session cannot be resolved", async () => {
     const calls: string[][] = [];
 
@@ -140,7 +192,10 @@ describe("watchPanePaths", () => {
       ok: false,
       message: "tmux pane path watcher unavailable.",
     });
-    expect(calls).toEqual([["tmux", "display-message", "-p", "#{session_id}"]]);
+    expect(calls).toEqual([
+      ["tmux", "display-message", "-p", "#{session_id}"],
+      ["tmux", "list-sessions", "-F", "#{session_id}"],
+    ]);
   });
 });
 

@@ -185,11 +185,21 @@ async function currentSessionId(): Promise<string | undefined> {
   const result = await runTmux(["display-message", "-p", "#{session_id}"]);
   const sessionId = result.stdout.trim();
 
-  if (result.exitCode !== 0 || !sessionId.startsWith("$")) {
+  if (result.exitCode === 0 && isSessionId(sessionId)) {
+    return sessionId;
+  }
+
+  const sessionsResult = await runTmux(["list-sessions", "-F", "#{session_id}"]);
+
+  if (sessionsResult.exitCode !== 0) {
     return undefined;
   }
 
-  return sessionId;
+  return sessionsResult.stdout.trim().split(/\r?\n/).find(isSessionId);
+}
+
+function isSessionId(value: string): boolean {
+  return value.startsWith("$");
 }
 
 async function listPaneIds(): Promise<string[] | undefined> {
