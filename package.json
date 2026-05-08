@@ -20,7 +20,7 @@
   },
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --target=bun --outdir=dist && chmod +x dist/index.js",
+    "build": "bun build src/index.ts --target=bun --external=@opentui/core --outdir=dist && chmod +x dist/index.js",
     "prepack": "bun run build",
     "check": "concurrently --kill-others-on-fail --success all \"bun run lint.check\" \"bun run format.check\" \"bun run tc\" \"bun run test\"",
     "check.fix": "bun run lint && bun run format && bun run check",
