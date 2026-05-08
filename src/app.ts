@@ -3,6 +3,7 @@ import { benchNow, createBenchRun, elapsedMs } from "./benchmark";
 import {
   focusPaneForAllClients,
   listSessions,
+  watchPanePaths,
   watchSessions,
   type TmuxSession,
   type TmuxSessionWatcher,
@@ -58,7 +59,9 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let refreshQueued = false;
   let nextRefreshForceGit = false;
   let sessionWatcher: TmuxSessionWatcher | undefined;
+  let pathWatcher: TmuxSessionWatcher | undefined;
   let isStartingWatcher = false;
+  let isStartingPathWatcher = false;
   let isFocusingPane = false;
   let selectedSessionId: string | undefined;
   let currentSessionId: string | undefined;
@@ -104,6 +107,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       }
 
       void sessionWatcher?.stop();
+      void pathWatcher?.stop();
     },
   });
   startupBench.add({ rendererMs: elapsedMs(rendererStartedAt) });
@@ -403,6 +407,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
         },
         () => {
           sessionWatcher = undefined;
+          void pathWatcher?.stop();
+          pathWatcher = undefined;
           startRefreshPolling(fallbackRefreshIntervalMs);
         },
         resetSelectedSessionToCurrent,
@@ -418,10 +424,43 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       if (result.ok === true) {
         sessionWatcher = result.watcher;
+        void ensurePathWatcher();
         startRefreshPolling(safetyRefreshIntervalMs);
       }
     } finally {
       isStartingWatcher = false;
+    }
+  }
+
+  async function ensurePathWatcher(): Promise<void> {
+    if (isDestroyed || pathWatcher || isStartingPathWatcher) {
+      return;
+    }
+
+    isStartingPathWatcher = true;
+    try {
+      const result = await watchPanePaths(
+        () => {
+          void refreshSessions();
+        },
+        () => {
+          pathWatcher = undefined;
+        },
+      );
+
+      if (isDestroyed) {
+        if (result.ok === true) {
+          await result.watcher.stop();
+        }
+
+        return;
+      }
+
+      if (result.ok === true) {
+        pathWatcher = result.watcher;
+      }
+    } finally {
+      isStartingPathWatcher = false;
     }
   }
 
@@ -441,6 +480,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       if (appMode !== "popup" && !sessionWatcher) {
         void benchmarkSessionWatcher();
+      } else if (appMode !== "popup" && sessionWatcher && !pathWatcher) {
+        void ensurePathWatcher();
       }
     }, intervalMs);
   }

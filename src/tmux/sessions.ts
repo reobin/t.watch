@@ -54,6 +54,13 @@ type PaneRecord = Omit<TmuxPane, "ssh"> & {
   pid: number;
   currentPath: string;
 };
+type SessionRecord = {
+  id: string;
+  name: string;
+  attached: boolean;
+  createdAt: Date;
+  activityAt: Date;
+};
 
 type ProcessInfo = {
   pid: number;
@@ -88,7 +95,12 @@ export async function listSessions(options: ListSessionsOptions = {}): Promise<T
       const processesByPid = new Map(
         processes.map((processInfo) => [processInfo.pid, processInfo]),
       );
-      const sshAttachedSessions = listSshAttachedSessions(clients, processes);
+      const visibleClients = visibleTmuxClients(clients ?? [], processes);
+      const attachedSessions =
+        clients && clients.length > 0
+          ? new Set(visibleClients.map((client) => client.sessionId))
+          : undefined;
+      const sshAttachedSessions = listSshAttachedSessions(visibleClients, processes);
       const panesByWindow = groupPanesByWindow(panes, processTree, processesByPid);
       const windowsBySession = groupWindowsBySession(windows, panesByWindow);
       timings.processTreeMs = elapsedMs(processTreeStartedAt);
@@ -97,7 +109,7 @@ export async function listSessions(options: ListSessionsOptions = {}): Promise<T
         .trim()
         .split(/\r?\n/)
         .filter(Boolean)
-        .map((line) => parseSession(line, windowsBySession, sshAttachedSessions));
+        .map((line) => parseSession(line, windowsBySession, sshAttachedSessions, attachedSessions));
       const sessionsWithMetadata = await benchAsync("gitMetadataMs", timings, () =>
         withSessionMetadata(sessions, options),
       );
@@ -165,11 +177,11 @@ async function listPanes(): Promise<PaneRecord[]> {
   return result.stdout.trim().split(/\r?\n/).filter(Boolean).map(parsePane);
 }
 
-async function listClients(): Promise<ClientRecord[]> {
+async function listClients(): Promise<ClientRecord[] | undefined> {
   const result = await runTmux(["list-clients", "-F", clientFormat]);
 
   if (result.exitCode !== 0) {
-    return [];
+    return undefined;
   }
 
   return result.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseClient);
@@ -203,15 +215,28 @@ function parseSession(
   line: string,
   windowsBySession: Map<string, TmuxWindow[]>,
   sshAttachedSessions: Set<string>,
+  attachedSessions: Set<string> | undefined,
 ): TmuxSession {
+  const record = parseSessionRecord(line);
+
+  return {
+    id: record.id,
+    name: record.name,
+    windows: windowsBySession.get(record.id) ?? [],
+    attached: attachedSessions?.has(record.id) ?? record.attached,
+    sshAttached: sshAttachedSessions.has(record.id),
+    createdAt: record.createdAt,
+    activityAt: record.activityAt,
+  };
+}
+
+function parseSessionRecord(line: string): SessionRecord {
   const [id, name, attached, createdAt, activityAt] = line.split(sessionSeparator);
 
   return {
     id: id ?? "",
     name: name ?? "",
-    windows: windowsBySession.get(id ?? "") ?? [],
     attached: Number(attached) > 0,
-    sshAttached: sshAttachedSessions.has(id ?? ""),
     createdAt: new Date(Number(createdAt) * 1000),
     activityAt: new Date(Number(activityAt) * 1000),
   };
@@ -338,6 +363,16 @@ function createProcessTree(processes: ProcessInfo[]): Map<number, ProcessInfo[]>
   return tree;
 }
 
+function visibleTmuxClients(clients: ClientRecord[], processes: ProcessInfo[]): ClientRecord[] {
+  if (processes.length === 0) {
+    return clients;
+  }
+
+  const processesByPid = new Map(processes.map((processInfo) => [processInfo.pid, processInfo]));
+
+  return clients.filter((client) => !hasAncestor(client.pid, processesByPid, process.pid));
+}
+
 function listSshAttachedSessions(clients: ClientRecord[], processes: ProcessInfo[]): Set<string> {
   const processesByPid = new Map(processes.map((processInfo) => [processInfo.pid, processInfo]));
   const localAttachedSessions = new Set<string>();
@@ -359,11 +394,19 @@ function listSshAttachedSessions(clients: ClientRecord[], processes: ProcessInfo
 }
 
 function hasSshAncestor(pid: number, processesByPid: Map<number, ProcessInfo>): boolean {
+  return hasAncestor(pid, processesByPid, (processInfo) => isSshdCommand(processInfo.command));
+}
+
+function hasAncestor(
+  pid: number,
+  processesByPid: Map<number, ProcessInfo>,
+  predicate: number | ((processInfo: ProcessInfo) => boolean),
+): boolean {
   let processInfo = processesByPid.get(pid);
   const seen = new Set<number>();
 
   while (processInfo && !seen.has(processInfo.pid)) {
-    if (isSshdCommand(processInfo.command)) {
+    if (typeof predicate === "number" ? processInfo.pid === predicate : predicate(processInfo)) {
       return true;
     }
 

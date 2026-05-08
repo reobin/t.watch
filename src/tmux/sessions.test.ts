@@ -442,6 +442,76 @@ describe("listSessions", () => {
     });
   });
 
+  test("ignores clients spawned by thud when detecting attached sessions", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "30"].join("\x1f") },
+        {
+          exitCode: 0,
+          stdout: [
+            `${process.pid} 1 bun bun run src/index.ts`,
+            `30 ${process.pid} tmux tmux -C attach-session -t $1`,
+          ].join("\n"),
+        },
+      ],
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          name: "work",
+          attached: false,
+          sshAttached: false,
+        },
+      ],
+    });
+  });
+
+  test("keeps ssh coloring when a session only has ssh and internal clients", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "2", "1700000000", "1700000100"].join("\x1f"),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "" },
+        {
+          exitCode: 0,
+          stdout: [["$1", "30"].join("\x1f"), ["$1", "40"].join("\x1f")].join("\n"),
+        },
+        {
+          exitCode: 0,
+          stdout: [
+            "10 1 sshd-session sshd-session: reobin [priv]",
+            "20 10 bash -bash",
+            "30 20 tmux tmux attach",
+            `${process.pid} 1 bun bun run src/index.ts`,
+            `40 ${process.pid} tmux tmux -C attach-session -t $1`,
+          ].join("\n"),
+        },
+      ],
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          name: "work",
+          attached: true,
+          sshAttached: true,
+        },
+      ],
+    });
+  });
+
   test("detects panes opened through ssh", async () => {
     mockTmux({
       results: [
