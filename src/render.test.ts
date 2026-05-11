@@ -748,9 +748,39 @@ describe("render", () => {
     );
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
-    expect(text).toContain("╎ ╶─ very-long-process");
+    expect(text).toContain("╎ ╶─ very-long-proc...");
     expect(text).not.toContain("needs a long approval label");
     expect(text.split("\n").every((line) => line.length <= 24)).toBe(true);
+  });
+
+  test("shortens long pane status labels with an ellipsis", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              panes: [
+                pane({
+                  processName: "opencode",
+                  integration: {
+                    tool: "opencode",
+                    status: "waiting",
+                    label: "needs a long approval label",
+                  },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { highlightSelected: true, width: 32 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("╎ ╶─ opencode ● needs a lon...");
+    expect(text).not.toContain("needs a long approval label");
+    expect(text.split("\n").every((line) => line.length <= 32)).toBe(true);
   });
 
   test("renders ssh panes in the ssh color", () => {

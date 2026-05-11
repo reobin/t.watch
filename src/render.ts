@@ -253,28 +253,45 @@ function fitEnd(text: string, width: number | undefined): string {
   return `${text.slice(0, width - marker.length)}${marker}`;
 }
 
-function fitLine(chunks: TextChunk[], width: number | undefined): TextChunk[] {
-  if (width === undefined) {
+function fitLineEnd(chunks: TextChunk[], width: number | undefined): TextChunk[] {
+  if (width === undefined || lineLengthOf(chunks) <= width) {
     return chunks;
   }
 
+  const marker = "...";
+  const markerSource = chunks.find((chunk) => chunk.text.length > 0) ?? textChunk(marker);
+
+  if (width <= marker.length) {
+    return [{ ...markerSource, text: marker.slice(0, width) }];
+  }
+
   const result: TextChunk[] = [];
-  let remaining = width;
+  let remaining = width - marker.length;
+  let markerChunk = markerSource;
 
   for (const chunk of chunks) {
+    if (chunk.text.length === 0) {
+      continue;
+    }
+
     if (remaining <= 0) {
+      markerChunk = chunk;
       break;
     }
 
     if (chunk.text.length <= remaining) {
       result.push(chunk);
       remaining -= chunk.text.length;
+      markerChunk = chunk;
       continue;
     }
 
     result.push({ ...chunk, text: chunk.text.slice(0, remaining) });
+    markerChunk = chunk;
     break;
   }
+
+  result.push({ ...markerChunk, text: marker });
 
   return result;
 }
@@ -359,7 +376,7 @@ function renderPaneName(
   ];
 
   return [
-    ...fitLine(paneRow, paneNameContentWidth(width)),
+    ...fitLineEnd(paneRow, paneNameContentWidth(width)),
     ...renderPaneContext(pane, textMutedFg, hasFollowingPane, width),
   ];
 }
@@ -533,6 +550,10 @@ function muted(text: string, textMutedFg: RGBA): TextChunk {
 
 function terminalFg(index: number, text: string): TextChunk {
   return fg(RGBA.fromIndex(index))(text);
+}
+
+function lineLengthOf(chunks: TextChunk[]): number {
+  return chunks.reduce((length, chunk) => length + chunk.text.length, 0);
 }
 
 function windowPaneBranch(paneCount: number, paneIndex: number): string {
