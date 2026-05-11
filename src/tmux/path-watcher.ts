@@ -3,9 +3,16 @@ import type { TmuxSessionWatchResult } from "./types";
 
 const pathSubscriptionPrefix = "thud-sh-path-";
 const pathSubscriptionFormat = "#{pane_current_path}";
-const pathSubscriptionSyncIntervalMs = 15000;
+const fieldSeparator = "\x1f";
+const pathSnapshotFormat = ["#{pane_id}", "#{pane_current_path}"].join(fieldSeparator);
+const pathSnapshotPollIntervalMs = 1000;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+type PanePathRecord = {
+  id: string;
+  path: string;
+};
 
 type ControlInput = {
   close: () => void | Promise<void>;
@@ -32,9 +39,11 @@ export async function watchPanePaths(
   let writer: ControlInput | undefined;
   let syncTimer: ReturnType<typeof setInterval> | undefined;
   let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+  let isSyncingPanePaths = false;
   let stopped = false;
   let cleanedUp = false;
   const subscribedPaneIds = new Set<string>();
+  const knownPanePaths = new Map<string, string>();
 
   const scheduleRefresh = () => {
     if (refreshTimeout) {
@@ -99,15 +108,20 @@ export async function watchPanePaths(
       return { ok: false, message: "tmux pane path watcher failed." };
     }
 
-    const paneIds = await listPaneIds();
+    const panePaths = await listPanePaths();
 
-    if (!paneIds) {
+    if (!panePaths) {
       await cleanup();
 
       return { ok: false, message: "tmux pane path watcher failed." };
     }
 
-    await syncSubscriptions(writer, subscribedPaneIds, paneIds);
+    syncKnownPanePaths(knownPanePaths, panePaths);
+    await syncSubscriptions(
+      writer,
+      subscribedPaneIds,
+      panePaths.map((pane) => pane.id),
+    );
   } catch (error) {
     await cleanup();
 
@@ -138,7 +152,19 @@ export async function watchPanePaths(
     },
     (line) => {
       if (line.startsWith(`%subscription-changed ${pathSubscriptionPrefix}`)) {
-        scheduleRefresh();
+        const panePath = parsePathSubscriptionChange(line);
+
+        if (!panePath) {
+          scheduleRefresh();
+          return;
+        }
+
+        const previousPath = knownPanePaths.get(panePath.id);
+        knownPanePaths.set(panePath.id, panePath.path);
+
+        if (previousPath !== panePath.path) {
+          scheduleRefresh();
+        }
       }
     },
   ).catch((error) => {
@@ -164,14 +190,32 @@ export async function watchPanePaths(
   })();
 
   syncTimer = setInterval(() => {
-    void (async () => {
-      const paneIds = await listPaneIds();
+    if (isSyncingPanePaths) {
+      return;
+    }
 
-      if (paneIds) {
-        await syncSubscriptions(controlWriter, subscribedPaneIds, paneIds);
+    isSyncingPanePaths = true;
+
+    void (async () => {
+      const panePaths = await listPanePaths();
+
+      if (panePaths) {
+        if (syncKnownPanePaths(knownPanePaths, panePaths)) {
+          scheduleRefresh();
+        }
+
+        await syncSubscriptions(
+          controlWriter,
+          subscribedPaneIds,
+          panePaths.map((pane) => pane.id),
+        );
       }
-    })().catch(() => undefined);
-  }, pathSubscriptionSyncIntervalMs);
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        isSyncingPanePaths = false;
+      });
+  }, pathSnapshotPollIntervalMs);
 
   return {
     ok: true,
@@ -202,14 +246,66 @@ function isSessionId(value: string): boolean {
   return value.startsWith("$");
 }
 
-async function listPaneIds(): Promise<string[] | undefined> {
-  const result = await runTmux(["list-panes", "-a", "-F", "#{pane_id}"]);
+async function listPanePaths(): Promise<PanePathRecord[] | undefined> {
+  const result = await runTmux(["list-panes", "-a", "-F", pathSnapshotFormat]);
 
   if (result.exitCode !== 0) {
     return undefined;
   }
 
-  return result.stdout.trim().split(/\r?\n/).filter(Boolean);
+  return result.stdout.trim().split(/\r?\n/).filter(Boolean).map(parsePanePath);
+}
+
+function parsePanePath(line: string): PanePathRecord {
+  const [id, path] = line.split(fieldSeparator);
+
+  return { id: id ?? "", path: path ?? "" };
+}
+
+function parsePathSubscriptionChange(line: string): PanePathRecord | undefined {
+  const valueSeparator = " : ";
+  const separatorIndex = line.indexOf(valueSeparator);
+
+  if (separatorIndex === -1) {
+    return undefined;
+  }
+
+  const fields = line.slice(0, separatorIndex).split(/\s+/);
+  const paneId = fields.at(-1);
+
+  if (!paneId) {
+    return undefined;
+  }
+
+  return { id: paneId, path: line.slice(separatorIndex + valueSeparator.length) };
+}
+
+function syncKnownPanePaths(
+  knownPanePaths: Map<string, string>,
+  panePaths: PanePathRecord[],
+): boolean {
+  let changed = false;
+  const nextPaneIds = new Set(panePaths.map((pane) => pane.id));
+
+  for (const paneId of knownPanePaths.keys()) {
+    if (!nextPaneIds.has(paneId)) {
+      knownPanePaths.delete(paneId);
+      changed = true;
+    }
+  }
+
+  for (const pane of panePaths) {
+    const hadPane = knownPanePaths.has(pane.id);
+    const previousPath = knownPanePaths.get(pane.id);
+
+    if (!hadPane || previousPath !== pane.path) {
+      changed = true;
+    }
+
+    knownPanePaths.set(pane.id, pane.path);
+  }
+
+  return changed;
 }
 
 async function syncSubscriptions(
