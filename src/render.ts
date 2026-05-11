@@ -99,7 +99,15 @@ function renderSession(
     ...renderSessionMetadata(session, textMutedFg, width),
   ];
 
+  const showWindowLabels = session.windows.length > 1;
+
   session.windows.forEach((window) => {
+    if (showWindowLabels) {
+      const label = fitMiddle(`${window.index}:${window.name}`, windowLabelContentWidth(width));
+
+      chunks.push(muted(`\n${label}`, textMutedFg));
+    }
+
     window.panes.forEach((pane, paneIndex) => {
       const isSelectedPane = isSelectedSession && pane.id === selectedPaneId;
       const branch = windowPaneBranch(window.panes.length, paneIndex);
@@ -153,6 +161,10 @@ function sessionHeaderContentWidth(width: number | undefined): number | undefine
 }
 
 function metadataContentWidth(width: number | undefined): number | undefined {
+  return rowContentWidth(width, 0);
+}
+
+function windowLabelContentWidth(width: number | undefined): number | undefined {
   return rowContentWidth(width, 0);
 }
 

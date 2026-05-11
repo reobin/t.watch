@@ -169,8 +169,10 @@ describe("render", () => {
       [
         "▎ /repo/work  work",
         "▎ main*",
+        "▎ 1:node",
         "▎ ╭─ opencode ● running",
         "▎ ╰─ bash",
+        "▎ 2:server",
         "▎ ╶─ bun",
         "",
         "▎ notes <ssh>",
@@ -203,8 +205,8 @@ describe("render", () => {
     expect(output.chunks.find((chunk) => chunk.text === "main")?.fg?.slot).toBe(8);
     expect(output.chunks.find((chunk) => chunk.text === "*")?.attributes).toBe(0);
     expect(output.chunks.find((chunk) => chunk.text === "*")?.fg?.slot).toBe(5);
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("node");
-    expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("server");
+    expect(output.chunks.map((chunk) => chunk.text).join("")).toContain("1:node");
+    expect(output.chunks.map((chunk) => chunk.text).join("")).toContain("2:server");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("window");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("pane");
     expect(output.chunks.map((chunk) => chunk.text).join("")).not.toContain("active");
@@ -283,6 +285,34 @@ describe("render", () => {
     expect(text).toContain("╎ feat/very-l...ack-branch  ");
     expect(text).toContain("╎ ╶─ opencode");
     expect(text.split("\n").every((line) => line.length <= 28)).toBe(true);
+  });
+
+  test("shortens long window labels within the terminal width", () => {
+    const output = renderSessions(
+      [
+        session({
+          windows: [
+            window({
+              index: 1,
+              name: "very-long-window-name",
+              panes: [pane({ processName: "opencode" })],
+            }),
+            window({
+              index: 2,
+              name: "server",
+              panes: [pane({ processName: "bun" })],
+            }),
+          ],
+        }),
+      ],
+      "$1",
+      { highlightSelected: true, width: 18 },
+    );
+    const text = output.chunks.map((chunk) => chunk.text).join("");
+
+    expect(text).toContain("╎ 1:very...-name  ");
+    expect(text).not.toContain("very-long-window-name");
+    expect(text.split("\n").every((line) => line.length <= 18)).toBe(true);
   });
 
   test("renders integration status markers", () => {
