@@ -5,6 +5,7 @@ import {
   listSessions,
   watchPanePaths,
   watchSessions,
+  type TmuxPaneIntegrationStatus,
   type TmuxSession,
   type TmuxSessionWatcher,
 } from "./tmux";
@@ -37,6 +38,7 @@ import {
   selectPreviousPane,
   selectPreviousSession,
 } from "./navigation";
+import { notifyWhenThudHidden, type AgentNotification } from "./notifications";
 
 const fallbackRefreshIntervalMs = 1500;
 const safetyRefreshIntervalMs = 15000;
@@ -75,6 +77,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let sessionNavigationOpen = false;
   let paneNavigationOpen = false;
   let sessions: TmuxSession[] = [];
+  let lastIntegrationStatuses: Map<string, TmuxPaneIntegrationStatus> | undefined;
   let terminalWidth = 0;
   let activePanel: "commands" | "help" | undefined;
   let selectedCommandIndex = 0;
@@ -550,7 +553,10 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       return false;
     }
 
+    const previousIntegrationStatuses = lastIntegrationStatuses;
+
     sessions = result.sessions;
+    lastIntegrationStatuses = integrationStatuses(sessions);
     const nextCurrentSessionId = resolvedCurrentSessionId();
     const appPaneLostTmuxFocus = Boolean(appPaneId) && !isAttachedActivePane(sessions, appPaneId);
 
@@ -576,8 +582,22 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     }
 
     syncStatusTickTimer();
+    notifyAgentStatusTransitions(previousIntegrationStatuses, sessions);
     renderCurrentView();
     return true;
+  }
+
+  function notifyAgentStatusTransitions(
+    previousStatuses: Map<string, TmuxPaneIntegrationStatus> | undefined,
+    currentSessions: TmuxSession[],
+  ): void {
+    if (!previousStatuses) {
+      return;
+    }
+
+    for (const notification of agentStatusNotifications(previousStatuses, currentSessions)) {
+      void notifyWhenThudHidden(notification);
+    }
   }
 
   function syncStatusTickTimer(): void {
@@ -939,6 +959,64 @@ export function hasTickingStatus(sessions: TmuxSession[]): boolean {
       ),
     ),
   );
+}
+
+export function integrationStatuses(
+  sessions: TmuxSession[],
+): Map<string, TmuxPaneIntegrationStatus> {
+  const statuses = new Map<string, TmuxPaneIntegrationStatus>();
+
+  for (const session of sessions) {
+    for (const window of session.windows) {
+      for (const pane of window.panes) {
+        const status = pane.integration?.status;
+
+        if (status) {
+          statuses.set(pane.id, status);
+        }
+      }
+    }
+  }
+
+  return statuses;
+}
+
+export function agentStatusNotifications(
+  previousStatuses: Map<string, TmuxPaneIntegrationStatus>,
+  sessions: TmuxSession[],
+): AgentNotification[] {
+  const notifications: AgentNotification[] = [];
+
+  for (const session of sessions) {
+    for (const window of session.windows) {
+      for (const pane of window.panes) {
+        const status = pane.integration?.status;
+        const previousStatus = previousStatuses.get(pane.id);
+
+        if (!status || !previousStatus || status === previousStatus) {
+          continue;
+        }
+
+        if (status === "waiting" && previousStatus !== "waiting") {
+          notifications.push({
+            title: "Agent needs attention",
+            body: `${session.name}: ${paneLabel(window.name, pane.title)} is waiting`,
+          });
+        } else if (status === "idle" && previousStatus === "running") {
+          notifications.push({
+            title: "Agent finished",
+            body: `${session.name}: ${paneLabel(window.name, pane.title)} is idle`,
+          });
+        }
+      }
+    }
+  }
+
+  return notifications;
+}
+
+function paneLabel(windowName: string, paneTitle: string): string {
+  return paneTitle && paneTitle !== windowName ? `${windowName} / ${paneTitle}` : windowName;
 }
 
 export function focusSessionsOptimistically(

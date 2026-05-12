@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { focusSessionsOptimistically, hasTickingStatus } from "./app";
+import {
+  agentStatusNotifications,
+  focusSessionsOptimistically,
+  hasTickingStatus,
+  integrationStatuses,
+} from "./app";
 import type { TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 describe("app", () => {
@@ -53,6 +58,44 @@ describe("app", () => {
     const sessions = [session({ id: "$1", paneId: "%1" })];
 
     expect(focusSessionsOptimistically(sessions, "%9")).toEqual({ sessions });
+  });
+
+  test("notifies when an agent starts waiting", () => {
+    const previous = integrationStatuses([session({ status: "running" })]);
+    const notifications = agentStatusNotifications(previous, [session({ status: "waiting" })]);
+
+    expect(notifications).toEqual([
+      {
+        title: "Agent needs attention",
+        body: "default: default / bash is waiting",
+      },
+    ]);
+  });
+
+  test("notifies when a running agent becomes idle", () => {
+    const previous = integrationStatuses([session({ status: "running" })]);
+    const notifications = agentStatusNotifications(previous, [session({ status: "idle" })]);
+
+    expect(notifications).toEqual([
+      {
+        title: "Agent finished",
+        body: "default: default / bash is idle",
+      },
+    ]);
+  });
+
+  test("does not notify for initial or irrelevant status states", () => {
+    expect(agentStatusNotifications(new Map(), [session({ status: "idle" })])).toEqual([]);
+    expect(
+      agentStatusNotifications(integrationStatuses([session({ status: "waiting" })]), [
+        session({ status: "idle" }),
+      ]),
+    ).toEqual([]);
+    expect(
+      agentStatusNotifications(integrationStatuses([session({ status: "idle" })]), [
+        session({ status: "running" }),
+      ]),
+    ).toEqual([]);
   });
 });
 
