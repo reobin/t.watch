@@ -14,6 +14,10 @@ import {
   renderMessage,
   renderNoSessions,
   renderSessions,
+  paneLineRange,
+  scrollLineRangeIntoView,
+  sessionLineRange,
+  sessionsLineCount,
   type RenderTheme,
 } from "./render";
 import { createScreen } from "./screen";
@@ -66,6 +70,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   let selectedSessionId: string | undefined;
   let currentSessionId: string | undefined;
   let selectedPaneId: string | undefined;
+  let sessionScrollY = 0;
   let sessionNavigationOpen = false;
   let paneNavigationOpen = false;
   let sessions: TmuxSession[] = [];
@@ -163,6 +168,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
   renderer.on("resize", (width) => {
     terminalWidth = width;
     if (sessions.length > 0) {
+      syncSelectedSessionScroll();
       renderCurrentView();
     }
   });
@@ -310,6 +316,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       sessionNavigationOpen = true;
       selectedSessionId = selectNextSession(sessions, selectedSessionId, currentSessionId);
+      syncSelectedSessionScroll();
       renderCurrentView();
       return;
     }
@@ -323,6 +330,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       sessionNavigationOpen = true;
       selectedSessionId = selectPreviousSession(sessions, selectedSessionId, currentSessionId);
+      syncSelectedSessionScroll();
       renderCurrentView();
       return;
     }
@@ -533,6 +541,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       closePaneNavigation();
       syncStatusTickTimer();
       screen.setContent(renderMessage(result.message));
+      sessionScrollY = 0;
+      screen.setContentScrollY(sessionScrollY);
       return false;
     }
 
@@ -556,6 +566,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       closePaneNavigation();
       syncStatusTickTimer();
       screen.setContent(renderNoSessions());
+      sessionScrollY = 0;
+      screen.setContentScrollY(sessionScrollY);
       return true;
     }
 
@@ -600,6 +612,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       return;
     }
 
+    syncSelectedSessionScroll();
     screen.setContent(
       renderSessions(sessions, selectedSessionId, {
         ...renderTheme,
@@ -609,6 +622,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
         width: terminalWidth,
       }),
     );
+    screen.setContentScrollY(sessionScrollY);
   }
 
   function renderCommandPanelView(): void {
@@ -702,6 +716,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     sessionNavigationOpen = true;
     selectedSessionId = findCurrentSessionId(sessions, currentSessionId);
     syncSelectedPane();
+    syncSelectedSessionScroll();
     renderCurrentView();
   }
 
@@ -738,6 +753,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
     selectedSessionId = nextSelectedSessionId;
     syncSelectedPane();
+    syncSelectedSessionScroll();
     renderCurrentView();
   }
 
@@ -802,6 +818,8 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
 
       if (result.ok === false) {
         screen.setContent(renderMessage(result.message));
+        sessionScrollY = 0;
+        screen.setContentScrollY(sessionScrollY);
         return;
       }
 
@@ -816,6 +834,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
         selectedSessionId = optimistic.sessionId;
         currentSessionId = optimistic.sessionId;
         syncSelectedPane();
+        syncSelectedSessionScroll();
         renderCurrentView();
       }
 
@@ -840,6 +859,20 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     if (!hasPane(session, selectedPaneId)) {
       selectedPaneId = findActivePaneId(session);
     }
+  }
+
+  function syncSelectedSessionScroll(): void {
+    const range =
+      (paneNavigationOpen
+        ? paneLineRange(sessions, selectedSessionId, selectedPaneId)
+        : undefined) ?? sessionLineRange(sessions, selectedSessionId);
+
+    sessionScrollY = scrollLineRangeIntoView(
+      sessionScrollY,
+      screen.contentHeight(),
+      sessionsLineCount(sessions),
+      range,
+    );
   }
 }
 

@@ -29,6 +29,11 @@ export type RenderTheme = {
   width?: number;
 };
 
+export type SessionLineRange = {
+  start: number;
+  end: number;
+};
+
 export function renderLoading(): string {
   return renderMessage("Loading tmux sessions...");
 }
@@ -63,6 +68,115 @@ export function renderSessions(
         theme.width,
       ),
     ]),
+  );
+}
+
+export function sessionLineRange(
+  sessions: TmuxSession[],
+  sessionId: string | undefined,
+): SessionLineRange | undefined {
+  let start = 0;
+
+  for (const session of sessions) {
+    const end = start + sessionLineCount(session);
+
+    if (session.id === sessionId) {
+      return { start, end };
+    }
+
+    start = end + 1;
+  }
+
+  return undefined;
+}
+
+export function paneLineRange(
+  sessions: TmuxSession[],
+  sessionId: string | undefined,
+  paneId: string | undefined,
+): SessionLineRange | undefined {
+  if (paneId === undefined) {
+    return undefined;
+  }
+
+  let sessionStart = 0;
+
+  for (const session of sessions) {
+    const sessionEnd = sessionStart + sessionLineCount(session);
+
+    if (session.id === sessionId) {
+      let start = sessionStart + 1 + (formatSessionMetadata(session) ? 1 : 0);
+      const hasWindowLabels = session.windows.length > 1;
+
+      for (const window of session.windows) {
+        if (hasWindowLabels) {
+          start += 1;
+        }
+
+        for (const pane of window.panes) {
+          const end = start + 1 + (opencodeTitle(pane) ? 1 : 0);
+
+          if (pane.id === paneId) {
+            return { start, end };
+          }
+
+          start = end;
+        }
+      }
+
+      return undefined;
+    }
+
+    sessionStart = sessionEnd + 1;
+  }
+
+  return undefined;
+}
+
+export function sessionsLineCount(sessions: TmuxSession[]): number {
+  if (sessions.length === 0) {
+    return 0;
+  }
+
+  return sessions.reduce(
+    (lines, session, index) => lines + sessionLineCount(session) + (index === 0 ? 0 : 1),
+    0,
+  );
+}
+
+export function scrollLineRangeIntoView(
+  scrollY: number,
+  viewportHeight: number,
+  totalLines: number,
+  range: SessionLineRange | undefined,
+): number {
+  const maxScrollY = Math.max(0, totalLines - Math.max(1, viewportHeight));
+  let nextScrollY = Math.min(Math.max(0, scrollY), maxScrollY);
+
+  if (!range || viewportHeight <= 0) {
+    return nextScrollY;
+  }
+
+  if (range.start < nextScrollY) {
+    nextScrollY = range.start;
+  } else if (range.end - range.start > viewportHeight) {
+    nextScrollY = range.start;
+  } else if (range.end > nextScrollY + viewportHeight) {
+    nextScrollY = range.end - viewportHeight;
+  }
+
+  return Math.min(Math.max(0, nextScrollY), maxScrollY);
+}
+
+function sessionLineCount(session: TmuxSession): number {
+  const hasWindowLabels = session.windows.length > 1;
+
+  return session.windows.reduce(
+    (count, window) =>
+      count +
+      (hasWindowLabels ? 1 : 0) +
+      window.panes.reduce((paneCount, pane) => paneCount + 1 + (opencodeTitle(pane) ? 1 : 0), 0),
+    1 + (formatSessionMetadata(session) ? 1 : 0),
   );
 }
 

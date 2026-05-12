@@ -2,7 +2,16 @@ import { homedir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import { RGBA, createTextAttributes } from "@opentui/core";
 import { renderCommandPanel, renderHelpPanel } from "./command-panel";
-import { renderLoading, renderMessage, renderNoSessions, renderSessions } from "./render";
+import {
+  paneLineRange,
+  renderLoading,
+  renderMessage,
+  renderNoSessions,
+  renderSessions,
+  scrollLineRangeIntoView,
+  sessionLineRange,
+  sessionsLineCount,
+} from "./render";
 import { commandPanelBackdropColor, renderShortcutFooter, renderStatusLine } from "./screen";
 import type { TmuxSession } from "./tmux";
 
@@ -1117,6 +1126,72 @@ describe("render", () => {
     );
 
     expect(output.chunks.some((chunk) => chunk.text === "▶─")).toBe(false);
+  });
+
+  test("calculates session line ranges in render order", () => {
+    const sessions = [
+      session({
+        id: "$1",
+        gitBranch: "main",
+        windows: [
+          window({
+            id: "@1",
+            panes: [pane({ id: "%1", processName: "opencode", title: "OC | Build thing" })],
+          }),
+          window({ id: "@2", index: 2, name: "server", panes: [pane({ id: "%2" })] }),
+        ],
+      }),
+      session({ id: "$2", windows: [window({ panes: [pane()] })] }),
+    ];
+
+    expect(sessionLineRange(sessions, "$1")).toEqual({ start: 0, end: 7 });
+    expect(sessionLineRange(sessions, "$2")).toEqual({ start: 8, end: 10 });
+    expect(sessionLineRange(sessions, "$3")).toBeUndefined();
+    expect(paneLineRange(sessions, "$1", "%1")).toEqual({ start: 3, end: 5 });
+    expect(paneLineRange(sessions, "$1", "%2")).toEqual({ start: 6, end: 7 });
+    expect(paneLineRange(sessions, "$2", "%1")).toEqual({ start: 9, end: 10 });
+    expect(paneLineRange(sessions, "$1", "%3")).toBeUndefined();
+    expect(sessionsLineCount(sessions)).toBe(10);
+  });
+
+  test("scrolls a selected pane range into view inside a tall session", () => {
+    const sessions = [
+      session({
+        id: "$1",
+        windows: [
+          window({
+            panes: [
+              pane({ id: "%1" }),
+              pane({ id: "%2" }),
+              pane({ id: "%3" }),
+              pane({ id: "%4" }),
+              pane({ id: "%5" }),
+              pane({ id: "%6" }),
+            ],
+          }),
+        ],
+      }),
+    ];
+
+    expect(
+      scrollLineRangeIntoView(0, 4, sessionsLineCount(sessions), sessionLineRange(sessions, "$1")),
+    ).toBe(0);
+    expect(
+      scrollLineRangeIntoView(
+        0,
+        4,
+        sessionsLineCount(sessions),
+        paneLineRange(sessions, "$1", "%6"),
+      ),
+    ).toBe(3);
+  });
+
+  test("scrolls a selected line range into view", () => {
+    expect(scrollLineRangeIntoView(0, 5, 20, { start: 8, end: 10 })).toBe(5);
+    expect(scrollLineRangeIntoView(8, 5, 20, { start: 3, end: 5 })).toBe(3);
+    expect(scrollLineRangeIntoView(4, 5, 20, { start: 5, end: 8 })).toBe(4);
+    expect(scrollLineRangeIntoView(0, 20, 100, { start: 0, end: 100 })).toBe(0);
+    expect(scrollLineRangeIntoView(19, 5, 20, undefined)).toBe(15);
   });
 });
 

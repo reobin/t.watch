@@ -17,6 +17,8 @@ const terminalBg = RGBA.defaultBackground();
 const muted = RGBA.fromIndex(8);
 
 type Screen = {
+  contentHeight: () => number;
+  setContentScrollY: (scrollY: number) => void;
   setCommandPanel: (content: ScreenContent) => void;
   setCommandPanelVisible: (visible: boolean) => void;
   setCommandPanelWidth: (width: number) => void;
@@ -49,6 +51,7 @@ export function createScreen(
     flexGrow: 1,
     fg: terminalFg,
     bg: "transparent",
+    overflow: "hidden",
   });
 
   const footer = new TextRenderable(renderer, {
@@ -89,6 +92,10 @@ export function createScreen(
   });
 
   return {
+    contentHeight: () => Math.max(1, view.height),
+    setContentScrollY: (scrollY) => {
+      view.scrollY = scrollY;
+    },
     setCommandPanel: (content) => {
       commandPanel.setContent(content);
     },
