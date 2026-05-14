@@ -72,6 +72,7 @@ describe("render", () => {
 
     expect(text).toContain("Keyboard Shortcuts");
     expect(text).toContain("\n\n  j/k, up/down  Select sessions, panes, or commands");
+    expect(text).toContain("  click         Focus a session or pane, or run a command");
     expect(text).toContain("  tab           Select panes in the selected session");
     expect(text).toContain("  J             Jump to the next agent pane that needs attention");
     expect(text).toContain("  ctrl+p        Open commands");
@@ -87,6 +88,7 @@ describe("render", () => {
 
     expect(text).toContain("Keyboard Shortcuts");
     expect(text).toContain("  j/k    select");
+    expect(text).toContain("  click  focus/run");
     expect(text).toContain("  tab    select panes");
     expect(text).toContain("  J      needs attention");
     expect(text).toContain("  ^P     commands");
@@ -101,6 +103,7 @@ describe("render", () => {
 
     expect(text).toContain("ctrl+p commands");
     expect(text).toContain("? help");
+    expect(text).toContain("click focus");
     expect(text).not.toContain("m mode");
     expect(text.split("\n").every((line) => line.length <= 80)).toBe(true);
   });
@@ -127,6 +130,7 @@ describe("render", () => {
 
     expect(text).toContain("Help");
     expect(text).toContain("j/k select");
+    expect(text).toContain("click focu");
     expect(text).toContain("tab select");
     expect(text).toContain("J needs");
     expect(text).toContain("^P command");

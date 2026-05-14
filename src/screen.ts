@@ -5,6 +5,7 @@ import {
   TextRenderable,
   fg,
   type CliRenderer,
+  type MouseEvent,
   type TextChunk,
 } from "@opentui/core";
 import { createCommandPanelOverlay } from "./command-panel";
@@ -20,9 +21,12 @@ type Screen = {
   contentHeight: () => number;
   setContentScrollY: (scrollY: number) => void;
   setCommandPanel: (content: ScreenContent) => void;
+  setCommandPanelBackdropMouseHandler: (handler: (() => void) | undefined) => void;
+  setCommandPanelMouseHandler: (handler: ((line: number) => void) | undefined) => void;
   setCommandPanelVisible: (visible: boolean) => void;
   setCommandPanelWidth: (width: number) => void;
   setContent: (content: ScreenContent) => void;
+  setSessionListMouseHandler: (handler: ((line: number) => void) | undefined) => void;
   setModeIndicator: (mode: string | undefined) => void;
 };
 
@@ -34,6 +38,7 @@ export function createScreen(
   renderer.setBackgroundColor(terminalBg);
   const textMutedFg = theme.textMutedFg ?? muted;
   const backdropBg = commandPanelBackdropColor(theme);
+  let sessionListMouseHandler: ((line: number) => void) | undefined;
   let modeIndicator: string | undefined;
 
   const layout = new BoxRenderable(renderer, {
@@ -52,6 +57,7 @@ export function createScreen(
     fg: terminalFg,
     bg: "transparent",
     overflow: "hidden",
+    selectable: false,
   });
 
   const footer = new TextRenderable(renderer, {
@@ -71,6 +77,22 @@ export function createScreen(
     fg: terminalFg,
     bg: "transparent",
   });
+
+  view.onMouseDown = (event) => {
+    if (!isPrimaryMouseEvent(event)) {
+      return;
+    }
+
+    const line = view.scrollY + event.y - view.screenY;
+
+    if (line < 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    sessionListMouseHandler?.(line);
+  };
 
   updateStatusLine(renderer.width);
   updateFooter(renderer.width);
@@ -99,6 +121,12 @@ export function createScreen(
     setCommandPanel: (content) => {
       commandPanel.setContent(content);
     },
+    setCommandPanelBackdropMouseHandler: (handler) => {
+      commandPanel.setBackdropMouseHandler(handler);
+    },
+    setCommandPanelMouseHandler: (handler) => {
+      commandPanel.setContentMouseHandler(handler);
+    },
     setCommandPanelVisible: (visible) => {
       commandPanel.setVisible(visible);
     },
@@ -107,6 +135,9 @@ export function createScreen(
     },
     setContent: (content) => {
       view.content = content;
+    },
+    setSessionListMouseHandler: (handler) => {
+      sessionListMouseHandler = handler;
     },
     setModeIndicator: (mode) => {
       modeIndicator = mode;
@@ -129,6 +160,10 @@ export function createScreen(
   }
 }
 
+function isPrimaryMouseEvent(event: MouseEvent): boolean {
+  return event.button === 0;
+}
+
 export function renderStatusLine(
   textMutedFg: RGBA,
   width: number,
@@ -149,6 +184,7 @@ export function renderShortcutFooter(textMutedFg: RGBA, width: number): StyledTe
   const items = [
     [fg(terminalFg)("ctrl+p"), fg(textMutedFg)(" commands")],
     [fg(terminalFg)("?"), fg(textMutedFg)(" help")],
+    [fg(terminalFg)("click"), fg(textMutedFg)(" focus")],
   ];
   const chunks: TextChunk[] = [];
   let lineLength = 0;

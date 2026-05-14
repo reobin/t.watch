@@ -9,6 +9,7 @@ import {
   type TmuxSessionWatcher,
 } from "./tmux";
 import { renderCommandPanel, renderHelpPanel, type CommandPanelItem } from "./command-panel";
+import { commandPanelIndexAtLine, sessionListHitTargetAtLine } from "./hit-targets";
 import {
   renderLoading,
   renderMessage,
@@ -164,6 +165,9 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     },
   ];
   syncModeIndicator();
+  screen.setSessionListMouseHandler(handleSessionListClick);
+  screen.setCommandPanelMouseHandler(handleCommandPanelClick);
+  screen.setCommandPanelBackdropMouseHandler(handleCommandPanelBackdropClick);
 
   renderer.on("resize", (width) => {
     terminalWidth = width;
@@ -623,6 +627,56 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       }),
     );
     screen.setContentScrollY(sessionScrollY);
+  }
+
+  function handleSessionListClick(line: number): void {
+    if (activePanel !== undefined) {
+      return;
+    }
+
+    const target = sessionListHitTargetAtLine(sessions, line, terminalWidth);
+
+    if (!target) {
+      return;
+    }
+
+    selectedSessionId = target.sessionId;
+    closeSessionNavigation();
+    closePaneNavigation();
+
+    if (target.type === "session") {
+      void focusSelectedSession();
+      return;
+    }
+
+    void focusPane(target.paneId);
+  }
+
+  function handleCommandPanelClick(line: number): void {
+    if (activePanel !== "commands") {
+      return;
+    }
+
+    const index = commandPanelIndexAtLine(line, commands.length);
+
+    if (index === undefined) {
+      return;
+    }
+
+    const command = commands[index];
+
+    selectedCommandIndex = index;
+    closeActivePanel();
+    void command?.run();
+  }
+
+  function handleCommandPanelBackdropClick(): void {
+    if (activePanel === undefined) {
+      return;
+    }
+
+    closeActivePanel();
+    renderCurrentView();
   }
 
   function renderCommandPanelView(): void {

@@ -6,6 +6,7 @@ import {
   bold,
   fg,
   type CliRenderer,
+  type MouseEvent,
   type TextChunk,
 } from "@opentui/core";
 import type { RenderTheme } from "./render";
@@ -25,7 +26,9 @@ export type CommandPanelItem = {
 };
 
 type CommandPanelOverlay = {
+  setBackdropMouseHandler: (handler: (() => void) | undefined) => void;
   setContent: (content: CommandPanelContent) => void;
+  setContentMouseHandler: (handler: ((line: number) => void) | undefined) => void;
   setVisible: (visible: boolean) => void;
   setWidth: (width: number) => void;
 };
@@ -78,6 +81,11 @@ export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
     {
       shortcut: "enter",
       description: "Focus or run the selected item",
+      compactDescription: "focus/run",
+    },
+    {
+      shortcut: "click",
+      description: "Focus a session or pane, or run a command",
       compactDescription: "focus/run",
     },
     {
@@ -145,6 +153,8 @@ export function createCommandPanelOverlay(
     mutedForeground: RGBA;
   },
 ): CommandPanelOverlay {
+  let backdropMouseHandler: (() => void) | undefined;
+  let contentMouseHandler: ((line: number) => void) | undefined;
   const overlay = new BoxRenderable(renderer, {
     id: "command-panel-overlay",
     position: "absolute",
@@ -189,7 +199,38 @@ export function createCommandPanelOverlay(
     width: "100%",
     fg: colors.foreground,
     bg: "transparent",
+    selectable: false,
   });
+
+  backdrop.onMouseDown = (event) => {
+    if (!isPrimaryMouseEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    backdropMouseHandler?.();
+  };
+
+  panel.onMouseDown = (event) => {
+    event.stopPropagation();
+  };
+
+  panelContent.onMouseDown = (event) => {
+    if (!isPrimaryMouseEvent(event)) {
+      return;
+    }
+
+    const line = event.y - panelContent.screenY;
+
+    if (line < 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    contentMouseHandler?.(line);
+  };
 
   panel.add(panelContent);
   overlay.add(backdrop);
@@ -197,8 +238,14 @@ export function createCommandPanelOverlay(
   renderer.root.add(overlay);
 
   return {
+    setBackdropMouseHandler: (handler) => {
+      backdropMouseHandler = handler;
+    },
     setContent: (content) => {
       panelContent.content = content;
+    },
+    setContentMouseHandler: (handler) => {
+      contentMouseHandler = handler;
     },
     setVisible: (visible) => {
       overlay.visible = visible;
@@ -207,6 +254,10 @@ export function createCommandPanelOverlay(
       panel.width = width;
     },
   };
+}
+
+function isPrimaryMouseEvent(event: MouseEvent): boolean {
+  return event.button === 0;
 }
 
 function renderCommandFooter(textMutedFg: RGBA, width: number | undefined): TextChunk[] {

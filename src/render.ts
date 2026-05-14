@@ -7,6 +7,7 @@ import {
   statusElapsedLabel,
   statusLabel,
 } from "./integration-status";
+import { paneContextTitle } from "./pane-display";
 import type { TmuxPane, TmuxPaneIntegrationStatus, TmuxSession } from "./tmux";
 
 const palette = {
@@ -114,7 +115,7 @@ export function paneLineRange(
         }
 
         for (const pane of window.panes) {
-          const end = start + 1 + (opencodeTitle(pane) ? 1 : 0);
+          const end = start + 1 + (paneContextTitle(pane) ? 1 : 0);
 
           if (pane.id === paneId) {
             return { start, end };
@@ -175,7 +176,7 @@ function sessionLineCount(session: TmuxSession): number {
     (count, window) =>
       count +
       (hasWindowLabels ? 1 : 0) +
-      window.panes.reduce((paneCount, pane) => paneCount + 1 + (opencodeTitle(pane) ? 1 : 0), 0),
+      window.panes.reduce((paneCount, pane) => paneCount + 1 + (paneContextTitle(pane) ? 1 : 0), 0),
     1 + (formatSessionMetadata(session) ? 1 : 0),
   );
 }
@@ -517,7 +518,7 @@ function renderPaneContext(
   hasFollowingPane: boolean,
   width: number | undefined,
 ): TextChunk[] {
-  const title = opencodeTitle(pane);
+  const title = paneContextTitle(pane);
   const prefix = hasFollowingPane ? "│  " : "   ";
 
   return title
@@ -527,19 +528,6 @@ function renderPaneContext(
 
 function paneContextContentWidth(width: number | undefined): number | undefined {
   return rowContentWidth(width, 3);
-}
-
-function opencodeTitle(pane: TmuxPane): string | undefined {
-  if (pane.processName !== "opencode" && pane.integration?.tool !== "opencode") {
-    return undefined;
-  }
-
-  const title = pane.title
-    .replace(/^OC \|\s*/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return title && title !== pane.title ? title : undefined;
 }
 
 function renderPaneProcessName(
