@@ -69,7 +69,7 @@ export function renderCommandPanel(
   return new StyledText(chunks);
 }
 
-export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
+export function renderHelpPanel(theme: RenderTheme & { version?: string } = {}): StyledText {
   const textMutedFg = theme.textMutedFg ?? RGBA.fromIndex(palette.gray);
   const items = [
     {
@@ -109,8 +109,16 @@ export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
       description: "Open commands",
       compactDescription: "commands",
     },
-    { shortcut: "m", description: "Cycle focus mode", compactDescription: "mode" },
-    { shortcut: "?", description: "Show this help", compactDescription: "help" },
+    {
+      shortcut: "m",
+      description: "Cycle focus mode",
+      compactDescription: "mode",
+    },
+    {
+      shortcut: "?",
+      description: "Show this help",
+      compactDescription: "help",
+    },
     { shortcut: "q", description: "Quit", compactDescription: "quit" },
   ];
   const mode = helpPanelMode(theme.width);
@@ -139,7 +147,7 @@ export function renderHelpPanel(theme: RenderTheme = {}): StyledText {
     );
   });
 
-  chunks.push(textChunk("\n\n"), ...renderHelpFooter(textMutedFg, theme.width));
+  chunks.push(textChunk("\n\n"), ...renderHelpFooter(textMutedFg, theme.width, theme.version));
 
   return new StyledText(chunks);
 }
@@ -329,12 +337,52 @@ function renderHelpRow(
   ]);
 }
 
-function renderHelpFooter(textMutedFg: RGBA, width: number | undefined): TextChunk[] {
+function renderHelpFooter(
+  textMutedFg: RGBA,
+  width: number | undefined,
+  version: string | undefined,
+): TextChunk[] {
   if (width !== undefined && width < 9) {
     return fitLine([active("esc")], width);
   }
 
-  return fitLine([active("esc"), muted(" close", textMutedFg)], width);
+  const chunks = fitLine([active("esc"), muted(" close", textMutedFg)], width);
+
+  if (version !== undefined) {
+    const versionFg = subduedTextColor(textMutedFg);
+
+    chunks.push(textChunk("\n"), ...rightAlignLine([muted(`v${version}`, versionFg)], width));
+  }
+
+  return chunks;
+}
+
+function rightAlignLine(chunks: TextChunk[], width: number | undefined): TextChunk[] {
+  if (width === undefined) {
+    return chunks;
+  }
+
+  const fittedChunks = fitLine(chunks, width);
+  const padding = width - lineLengthOf(fittedChunks);
+
+  return padding > 0 ? [textChunk(" ".repeat(padding)), ...fittedChunks] : fittedChunks;
+}
+
+function subduedTextColor(color: RGBA): RGBA {
+  const [red, green, blue, alpha] = color.toInts();
+  const luminance = 0.299 * red + 0.587 * green + 0.114 * blue;
+  const amount = luminance > 128 ? -44 : 36;
+
+  return RGBA.fromInts(
+    clampColor(red + amount),
+    clampColor(green + amount),
+    clampColor(blue + amount),
+    alpha,
+  );
+}
+
+function clampColor(value: number): number {
+  return Math.max(0, Math.min(value, 255));
 }
 
 function helpPanelMode(width: number | undefined): "full" | "compact" | "tight" {

@@ -67,7 +67,7 @@ describe("render", () => {
   });
 
   test("renders a help panel", () => {
-    const output = renderHelpPanel({ width: 68 });
+    const output = renderHelpPanel({ width: 68, version: "0.15.1" });
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
     expect(text).toContain("Keyboard Shortcuts");
@@ -78,12 +78,13 @@ describe("render", () => {
     expect(text).toContain("  ctrl+p        Open commands");
     expect(text).toContain("  m             Cycle focus mode");
     expect(text).toContain("  ?             Show this help");
-    expect(text).toContain("esc close");
+    expect(text).toContain("esc close\n");
+    expect(text.split("\n").find((line) => line.endsWith("v0.15.1"))).toHaveLength(68);
     expect(text.split("\n").every((line) => line.length <= 68)).toBe(true);
   });
 
   test("renders compact help when narrow", () => {
-    const output = renderHelpPanel({ width: 30 });
+    const output = renderHelpPanel({ width: 30, version: "0.15.1" });
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
     expect(text).toContain("Keyboard Shortcuts");
@@ -93,6 +94,8 @@ describe("render", () => {
     expect(text).toContain("  J      needs attention");
     expect(text).toContain("  ^P     commands");
     expect(text).toContain("  m      mode");
+    expect(text).toContain("esc close\n");
+    expect(text.split("\n").find((line) => line.endsWith("v0.15.1"))).toHaveLength(30);
     expect(text).not.toContain("Select sessions, panes, or commands");
     expect(text.split("\n").every((line) => line.length <= 30)).toBe(true);
   });
@@ -125,7 +128,7 @@ describe("render", () => {
   });
 
   test("keeps compact help descriptions when very narrow", () => {
-    const output = renderHelpPanel({ width: 10 });
+    const output = renderHelpPanel({ width: 10, version: "0.15.1" });
     const text = output.chunks.map((chunk) => chunk.text).join("");
 
     expect(text).toContain("Help");
@@ -137,6 +140,28 @@ describe("render", () => {
     expect(text).toContain("\n  attentio");
     expect(text).not.toContain("\nJ attentio");
     expect(text.split("\n").every((line) => line.length <= 10)).toBe(true);
+  });
+
+  test("derives the help version color from the muted foreground", () => {
+    const darkThemeMuted = RGBA.fromInts(188, 188, 188);
+    const lightThemeMuted = RGBA.fromInts(85, 85, 85);
+    const darkOutput = renderHelpPanel({
+      width: 68,
+      textMutedFg: darkThemeMuted,
+      version: "0.15.1",
+    });
+    const lightOutput = renderHelpPanel({
+      width: 68,
+      textMutedFg: lightThemeMuted,
+      version: "0.15.1",
+    });
+
+    expect(darkOutput.chunks.find((chunk) => chunk.text === "v0.15.1")?.fg?.toInts()).toEqual([
+      144, 144, 144, 255,
+    ]);
+    expect(lightOutput.chunks.find((chunk) => chunk.text === "v0.15.1")?.fg?.toInts()).toEqual([
+      121, 121, 121, 255,
+    ]);
   });
 
   test("renders session names", () => {
@@ -946,7 +971,11 @@ describe("render", () => {
   test("uses a custom selected session background", () => {
     const selectedBg = RGBA.fromInts(245, 245, 245);
     const output = renderSessions(
-      [session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] })],
+      [
+        session({
+          windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
+        }),
+      ],
       "$1",
       { highlightSelected: true, selectedBg },
     );
@@ -985,7 +1014,9 @@ describe("render", () => {
 
   test("keeps session text aligned when selection changes", () => {
     const sessions = [
-      session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] }),
+      session({
+        windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
+      }),
     ];
     const unselectedText = renderSessions(sessions)
       .chunks.map((chunk) => chunk.text)
@@ -999,7 +1030,11 @@ describe("render", () => {
 
   test("pads selected session rows to the terminal width", () => {
     const output = renderSessions(
-      [session({ windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })] })],
+      [
+        session({
+          windows: [window({ panes: [pane({ id: "%1", processName: "opencode" })] })],
+        }),
+      ],
       "$1",
       { highlightSelected: true, width: 20 },
     );
@@ -1140,9 +1175,20 @@ describe("render", () => {
         windows: [
           window({
             id: "@1",
-            panes: [pane({ id: "%1", processName: "opencode", title: "OC | Build thing" })],
+            panes: [
+              pane({
+                id: "%1",
+                processName: "opencode",
+                title: "OC | Build thing",
+              }),
+            ],
           }),
-          window({ id: "@2", index: 2, name: "server", panes: [pane({ id: "%2" })] }),
+          window({
+            id: "@2",
+            index: 2,
+            name: "server",
+            panes: [pane({ id: "%2" })],
+          }),
         ],
       }),
       session({ id: "$2", windows: [window({ panes: [pane()] })] }),

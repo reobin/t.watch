@@ -57,6 +57,7 @@ export type AppOptions = {
 };
 
 export async function startApp(options: AppOptions = {}): Promise<void> {
+  const version = await packageVersion();
   let isDestroyed = false;
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let refreshTimerIntervalMs: number | undefined;
@@ -697,7 +698,7 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
     const contentWidth = Math.max(1, width - commandPanelChromeWidth);
 
     screen.setCommandPanelWidth(width);
-    screen.setCommandPanel(renderHelpPanel({ ...renderTheme, width: contentWidth }));
+    screen.setCommandPanel(renderHelpPanel({ ...renderTheme, width: contentWidth, version }));
   }
 
   function openHelpPanel(): void {
@@ -928,6 +929,18 @@ export async function startApp(options: AppOptions = {}): Promise<void> {
       range,
     );
   }
+}
+
+async function packageVersion(): Promise<string> {
+  const packageJson = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as {
+    version?: unknown;
+  };
+
+  if (typeof packageJson.version !== "string") {
+    throw new Error("package.json version is missing.");
+  }
+
+  return packageJson.version;
 }
 
 export function hasTickingStatus(sessions: TmuxSession[]): boolean {
