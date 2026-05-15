@@ -289,11 +289,14 @@ describe("watchPanePaths", () => {
     const result = await watchPanePaths(onChange);
 
     expect(result.ok).toBe(true);
-    await waitFor(() => commands.some((command) => command.includes("thud-sh-path-_2:%2")));
-    expect(onChange).toHaveBeenCalledTimes(1);
-
-    if (result.ok === true) {
-      await result.watcher.stop();
+    try {
+      await waitFor(() => commands.some((command) => command.includes("thud-sh-path-_2:%2")));
+      await waitFor(() => onChange.mock.calls.length === 1);
+      expect(onChange).toHaveBeenCalledTimes(1);
+    } finally {
+      if (result.ok === true) {
+        await result.watcher.stop();
+      }
     }
   });
 
@@ -343,15 +346,17 @@ describe("watchPanePaths", () => {
     const result = await watchPanePaths(onChange);
 
     expect(result.ok).toBe(true);
-    await waitFor(() => listPanesCount === 2);
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    try {
+      await waitFor(() => listPanesCount === 2);
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
-    expect(listPanesCount).toBe(2);
+      expect(listPanesCount).toBe(2);
+    } finally {
+      pollResult.resolve();
 
-    pollResult.resolve();
-
-    if (result.ok === true) {
-      await result.watcher.stop();
+      if (result.ok === true) {
+        await result.watcher.stop();
+      }
     }
   });
 });
