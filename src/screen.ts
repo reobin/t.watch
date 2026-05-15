@@ -184,7 +184,6 @@ export function renderShortcutFooter(textMutedFg: RGBA, width: number): StyledTe
   const items = [
     [fg(terminalFg)("ctrl+p"), fg(textMutedFg)(" commands")],
     [fg(terminalFg)("?"), fg(textMutedFg)(" help")],
-    [fg(terminalFg)("click"), fg(textMutedFg)(" focus")],
   ];
   const chunks: TextChunk[] = [];
   let lineLength = 0;

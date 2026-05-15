@@ -103,7 +103,7 @@ describe("render", () => {
 
     expect(text).toContain("ctrl+p commands");
     expect(text).toContain("? help");
-    expect(text).toContain("click focus");
+    expect(text).not.toContain("click focus");
     expect(text).not.toContain("m mode");
     expect(text.split("\n").every((line) => line.length <= 80)).toBe(true);
   });
