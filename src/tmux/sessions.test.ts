@@ -784,6 +784,49 @@ describe("listSessions", () => {
     });
   });
 
+  test("uses codex binary names for Codex panes", async () => {
+    mockSinglePaneTmux({
+      pane: [
+        "$1",
+        "@1",
+        "%1",
+        "1",
+        "1",
+        "codex-linux-x64",
+        "10",
+        "codex",
+        "codex",
+        "waiting",
+        "",
+        "1700000110",
+        "/repo/work",
+      ],
+      process: "100 10 codex-linux-x64 codex-linux-x64",
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          windows: [
+            {
+              panes: [
+                {
+                  command: "codex-linux-x64",
+                  processName: "codex",
+                  integration: {
+                    tool: "codex",
+                    status: "waiting",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   test("keeps runtime names when flags obscure the target", async () => {
     mockSinglePaneTmux({
       pane: ["$1", "@1", "%1", "1", "1", "node", "10", "shell"],

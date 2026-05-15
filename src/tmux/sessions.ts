@@ -669,6 +669,10 @@ function prettifyProcessName(name: string): string {
     return "opencode";
   }
 
+  if (base === "codex" || base === "codex-linux-x64" || base === "codex-aarch64") {
+    return "codex";
+  }
+
   return base || "shell";
 }
 

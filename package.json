@@ -7,15 +7,18 @@
   },
   "bin": {
     "thud": "dist/index.js",
+    "thud-codex-status": "integrations/codex/thud-sh-status.ts",
     "thud.sh": "dist/index.js"
   },
   "files": [
     "dist",
+    "integrations/codex/thud-sh-status.ts",
     "integrations/opencode/thud-sh-status.ts",
     "README.md"
   ],
   "type": "module",
   "exports": {
+    "./codex-status": "./integrations/codex/thud-sh-status.ts",
     "./server": "./integrations/opencode/thud-sh-status.ts"
   },
   "scripts": {

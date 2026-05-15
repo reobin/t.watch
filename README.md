@@ -63,6 +63,20 @@ To show OpenCode pane status in `thud`:
 opencode plugin thud.sh
 ```
 
+## Codex status integration
+
+To show Codex CLI pane status in `thud`, add hooks to `~/.codex/config.toml`:
+
+```toml
+[hooks]
+SessionStart = [{ hooks = [{ type = "command", command = "thud-codex-status" }] }]
+UserPromptSubmit = [{ hooks = [{ type = "command", command = "thud-codex-status" }] }]
+PreToolUse = [{ hooks = [{ type = "command", command = "thud-codex-status" }] }]
+PermissionRequest = [{ hooks = [{ type = "command", command = "thud-codex-status" }] }]
+PostToolUse = [{ hooks = [{ type = "command", command = "thud-codex-status" }] }]
+Stop = [{ hooks = [{ type = "command", command = "thud-codex-status" }] }]
+```
+
 ## Development
 
 ```sh
