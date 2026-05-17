@@ -58,7 +58,7 @@ describe("listSessions", () => {
             ["$2", "@3", "%3", "1", "1", "vim", "30", "notes"].join("\x1f"),
           ].join("\n"),
         },
-        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "100", "0"].join("\x1f") },
         {
           exitCode: 0,
           stdout: ["100 10 node node /home/reobin/.local/bin/opencode", "200 20 bash -bash"].join(
@@ -171,7 +171,7 @@ describe("listSessions", () => {
         "-F",
         "#{session_id}\x1f#{window_id}\x1f#{pane_id}\x1f#{pane_index}\x1f#{pane_active}\x1f#{pane_current_command}\x1f#{pane_pid}\x1f#{pane_title}\x1f#{@thud_sh_tool}\x1f#{@thud_sh_status}\x1f#{@thud_sh_status_label}\x1f#{@thud_sh_status_updated_at}\x1f#{pane_current_path}",
       ],
-      ["tmux", "list-clients", "-F", "#{session_id}\x1f#{client_pid}"],
+      ["tmux", "list-clients", "-F", "#{session_id}\x1f#{client_pid}\x1f#{client_control_mode}"],
       ["ps", "-eo", "pid=,ppid=,comm=,args="],
     ]);
   });
@@ -198,7 +198,7 @@ describe("listSessions", () => {
             ),
           ].join("\n"),
         },
-        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "100", "0"].join("\x1f") },
         { exitCode: 0, stdout: "100 10 bash -bash\n200 20 bash -bash" },
         { exitCode: 0, stdout: "main\n" },
         { exitCode: 0, stdout: " M src/index.ts\n" },
@@ -252,7 +252,7 @@ describe("listSessions", () => {
             ["$1", "@1", "%2", "2", "1", "bash", "20", "shell", "", "", "", "", ""].join("\x1f"),
           ].join("\n"),
         },
-        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "100", "0"].join("\x1f") },
         { exitCode: 0, stdout: "100 10 bash -bash\n200 20 bash -bash" },
         { exitCode: 0, stdout: "main\n" },
         { exitCode: 0, stdout: "" },
@@ -308,7 +308,7 @@ describe("listSessions", () => {
             "/repo/work",
           ].join("\x1f"),
         },
-        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "100", "0"].join("\x1f") },
         { exitCode: 0, stdout: "100 10 bash -bash" },
         { exitCode: 1, stdout: "" },
         { exitCode: 0, stdout: "abc1234\n" },
@@ -512,6 +512,35 @@ describe("listSessions", () => {
     });
   });
 
+  test("ignores tmux control-mode clients when detecting attached sessions", async () => {
+    mockTmux({
+      results: [
+        {
+          exitCode: 0,
+          stdout: ["$1", "work", "1", "1700000000", "1700000100"].join("\x1f"),
+        },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "30", "1"].join("\x1f") },
+        {
+          exitCode: 0,
+          stdout: ["10 1 bun bun run thud", "30 10 tmux tmux -C attach-session -t $1"].join("\n"),
+        },
+      ],
+    });
+
+    await expect(listSessions()).resolves.toMatchObject({
+      ok: true,
+      sessions: [
+        {
+          name: "work",
+          attached: false,
+          sshAttached: false,
+        },
+      ],
+    });
+  });
+
   test("detects panes opened through ssh", async () => {
     mockTmux({
       results: [
@@ -573,7 +602,7 @@ describe("listSessions", () => {
           stdout: ["$1", "@1", "1", "work", "1"].join("\x1f"),
         },
         { exitCode: 1, stderr: "pane listing failed" },
-        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "100", "0"].join("\x1f") },
         { exitCode: 0, stdout: "" },
       ],
     });
@@ -969,7 +998,7 @@ describe("listSessions", () => {
           exitCode: 0,
           stdout: ["$1", "@1", "%1", "1", "1", "nvim", "40", "node thread"].join("\x1f"),
         },
-        { exitCode: 0, stdout: "" },
+        { exitCode: 0, stdout: ["$1", "100", "0"].join("\x1f") },
         {
           exitCode: 0,
           stdout: "400 40 lazygit lazygit",

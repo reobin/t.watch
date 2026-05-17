@@ -42,7 +42,9 @@ const paneFormat = [
   "#{@thud_sh_status_updated_at}",
   "#{pane_current_path}",
 ].join(fieldSeparator);
-const clientFormat = ["#{session_id}", "#{client_pid}"].join(fieldSeparator);
+const clientFormat = ["#{session_id}", "#{client_pid}", "#{client_control_mode}"].join(
+  fieldSeparator,
+);
 
 type ListSessionsOptions = {
   forceGit?: boolean;
@@ -72,6 +74,7 @@ type ProcessInfo = {
 type ClientRecord = {
   sessionId: string;
   pid: number;
+  controlMode: boolean;
 };
 
 export async function listSessions(options: ListSessionsOptions = {}): Promise<TmuxSessionsResult> {
@@ -96,10 +99,9 @@ export async function listSessions(options: ListSessionsOptions = {}): Promise<T
         processes.map((processInfo) => [processInfo.pid, processInfo]),
       );
       const visibleClients = visibleTmuxClients(clients ?? [], processes);
-      const attachedSessions =
-        clients && clients.length > 0
-          ? new Set(visibleClients.map((client) => client.sessionId))
-          : undefined;
+      const attachedSessions = clients
+        ? new Set(visibleClients.map((client) => client.sessionId))
+        : undefined;
       const sshAttachedSessions = listSshAttachedSessions(visibleClients, processes);
       const panesByWindow = groupPanesByWindow(panes, processTree, processesByPid);
       const windowsBySession = groupWindowsBySession(windows, panesByWindow);
@@ -243,11 +245,12 @@ function parseSessionRecord(line: string): SessionRecord {
 }
 
 function parseClient(line: string): ClientRecord {
-  const [sessionId, pid] = line.split(fieldSeparator);
+  const [sessionId, pid, controlMode] = line.split(fieldSeparator);
 
   return {
     sessionId: sessionId ?? "",
     pid: Number(pid),
+    controlMode: Number(controlMode) > 0,
   };
 }
 
@@ -364,13 +367,17 @@ function createProcessTree(processes: ProcessInfo[]): Map<number, ProcessInfo[]>
 }
 
 function visibleTmuxClients(clients: ClientRecord[], processes: ProcessInfo[]): ClientRecord[] {
+  const nonControlClients = clients.filter((client) => !client.controlMode);
+
   if (processes.length === 0) {
-    return clients;
+    return nonControlClients;
   }
 
   const processesByPid = new Map(processes.map((processInfo) => [processInfo.pid, processInfo]));
 
-  return clients.filter((client) => !hasAncestor(client.pid, processesByPid, process.pid));
+  return nonControlClients.filter(
+    (client) => !hasAncestor(client.pid, processesByPid, process.pid),
+  );
 }
 
 function listSshAttachedSessions(clients: ClientRecord[], processes: ProcessInfo[]): Set<string> {

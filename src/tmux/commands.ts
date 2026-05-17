@@ -1,17 +1,23 @@
-import type { TmuxCheckResult, TmuxClient, TmuxFocusPaneResult } from "./types";
+import type { TmuxCheckResult, TmuxFocusPaneResult } from "./types";
 
 export const missingTmuxMessage = "tmux is required but was not found.";
 const clientSeparator = "\x1f";
-const clientFormat = ["#{client_name}", "#{client_tty}"].join(clientSeparator);
+const clientFormat = ["#{client_name}", "#{client_tty}", "#{client_control_mode}"].join(
+  clientSeparator,
+);
 type TmuxClientsResult =
   | {
       ok: true;
-      clients: TmuxClient[];
+      clients: ClientRecord[];
     }
   | {
       ok: false;
       message: string;
     };
+type ClientRecord = {
+  target: string;
+  controlMode: boolean;
+};
 
 export async function checkTmux(): Promise<TmuxCheckResult> {
   try {
@@ -105,14 +111,23 @@ async function listClients(): Promise<TmuxClientsResult> {
 
   return {
     ok: true,
-    clients: result.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseClient),
+    clients: result.stdout
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map(parseClient)
+      .filter(isVisibleClient),
   };
 }
 
-function parseClient(line: string): TmuxClient {
-  const [name, tty] = line.split(clientSeparator);
+function parseClient(line: string): ClientRecord {
+  const [name, tty, controlMode] = line.split(clientSeparator);
 
-  return { target: name || tty || "" };
+  return { target: name || tty || "", controlMode: Number(controlMode) > 0 };
+}
+
+function isVisibleClient(client: ClientRecord): boolean {
+  return !client.controlMode;
 }
 
 export async function runTmux(args: string[]): Promise<{

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { checkTmux, focusPaneForAllClients } from "./commands";
 
+const clientFormat = "#{client_name}\x1f#{client_tty}\x1f#{client_control_mode}";
+
 describe("checkTmux", () => {
   afterEach(() => {
     mock.restore();
@@ -83,10 +85,32 @@ describe("focusPaneForAllClients", () => {
 
     await expect(focusPaneForAllClients("%3")).resolves.toEqual({ ok: true });
     expect(calls).toEqual([
-      ["tmux", "list-clients", "-F", "#{client_name}\x1f#{client_tty}"],
+      ["tmux", "list-clients", "-F", clientFormat],
       ["tmux", "switch-client", "-c", "client-a", "-t", "%3"],
       ["tmux", "switch-client", "-c", "/dev/pts/2", "-t", "%3"],
     ]);
+  });
+
+  test("ignores tmux control-mode clients", async () => {
+    const calls = mockTmuxResults([
+      { exitCode: 0, stdout: "client-a\x1f/dev/pts/1\x1f0\ncontrol\x1f/dev/pts/2\x1f1" },
+      { exitCode: 0 },
+    ]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({ ok: true });
+    expect(calls).toEqual([
+      ["tmux", "list-clients", "-F", clientFormat],
+      ["tmux", "switch-client", "-c", "client-a", "-t", "%3"],
+    ]);
+  });
+
+  test("reports a missing-client message when only control-mode clients are attached", async () => {
+    mockTmuxResults([{ exitCode: 0, stdout: "control\x1f/dev/pts/1\x1f1" }]);
+
+    await expect(focusPaneForAllClients("%3")).resolves.toEqual({
+      ok: false,
+      message: "No tmux clients attached.",
+    });
   });
 
   test("reports a missing-client message when no clients are attached", async () => {

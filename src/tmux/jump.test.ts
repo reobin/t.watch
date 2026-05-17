@@ -18,7 +18,7 @@ const paneFormat = [
   "#{@thud_sh_owner_pid}",
   "#{@thud_sh_owner_start_time}",
 ].join(separator);
-const clientFormat = ["#{client_name}", "#{client_tty}"].join(separator);
+const clientFormat = ["#{client_name}", "#{client_tty}", "#{client_control_mode}"].join(separator);
 let procRoot: string | undefined;
 
 describe("jumpToNextPane", () => {
